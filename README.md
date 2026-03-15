@@ -81,8 +81,7 @@ sales_items     → Line items for each sale with profit tracking
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/smart-erp-system.git
-cd smart-erp-system
+git clone https://github.com/prithimeganathan-bot/smart_erp_system.git
 ```
 
 ### 2. Create Virtual Environment
