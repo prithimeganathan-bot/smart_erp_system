@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1><i class="fa-solid fa-users-gear page-icon"></i> User Management</h1>
+    <p class="page-sub">Create and manage staff and admin accounts</p>
+</div>
+
+<div class="card form-card">
+    <h2><i class="fa-solid fa-user-plus"></i> Add New User</h2>
+    <div class="form-grid">
+        <div class="input-wrap">
+            <label>Username</label>
+            <input type="text" id="new_username" placeholder="e.g. john_staff">
+        </div>
+        <div class="input-wrap">
+            <label>Password</label>
+            <div class="pass-wrap">
+                <input type="password" id="new_password" placeholder="Enter password">
+                <i class="fa-solid fa-eye eye-toggle" onclick="togglePass('new_password', this)"></i>
+            </div>
+        </div>
+        <div class="input-wrap">
+            <label>Role</label>
+            <select id="new_role">
+                <option value="staff">Staff</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-actions">
+        <button class="btn-primary" onclick="addUser()">
+            <i class="fa-solid fa-plus"></i> Create User
+        </button>
+    </div>
+    <div id="userMessage" class="form-message"></div>
+</div>
+
+<div class="card">
+    <h2><i class="fa-solid fa-users"></i> All Users</h2>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Username</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="usersBody">
+                <tr><td colspan="5" class="loading-row">Loading users...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="roles-grid">
+    <div class="role-card">
+        <div class="role-icon admin-icon"><i class="fa-solid fa-shield-halved"></i></div>
+        <div class="role-info">
+            <h3>Admin</h3>
+            <ul>
+                <li><i class="fa-solid fa-check ci"></i> Full access to all pages</li>
+                <li><i class="fa-solid fa-check ci"></i> Add, edit, delete products</li>
+                <li><i class="fa-solid fa-check ci"></i> Manage users</li>
+                <li><i class="fa-solid fa-check ci"></i> View all reports</li>
+            </ul>
+        </div>
+    </div>
+    <div class="role-card">
+        <div class="role-icon staff-icon"><i class="fa-solid fa-user"></i></div>
+        <div class="role-info">
+            <h3>Staff</h3>
+            <ul>
+                <li><i class="fa-solid fa-check ci"></i> View products</li>
+                <li><i class="fa-solid fa-check ci"></i> Record sales</li>
+                <li><i class="fa-solid fa-check ci"></i> Record purchases</li>
+                <li><i class="fa-solid fa-xmark cx"></i> Cannot manage users</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<style>
+.pass-wrap { position: relative; }
+.pass-wrap input { width: 100%; padding-right: 40px; }
+.eye-toggle { position: absolute; right: 13px; top: 50%; transform: translateY(-50%); color: var(--text-muted); cursor: pointer; font-size: 0.88rem; transition: color 0.2s; }
+.eye-toggle:hover { color: var(--text-second); }
+
+.user-avatar-sm {
+    width: 30px; height: 30px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+    border-radius: 50%; display: inline-flex;
+    align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.78rem; color: #0f172a;
+    margin-right: 10px; vertical-align: middle;
+}
+
+.role-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 6px; font-size: 0.78rem; font-weight: 600; }
+.role-admin { background: rgba(56,189,248,0.1);  color: var(--accent); }
+.role-staff { background: rgba(148,163,184,0.1); color: var(--text-muted); }
+
+.status-active {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 6px; font-size: 0.75rem;
+    font-weight: 600; background: rgba(34,197,94,0.1); color: var(--success-text);
+}
+.status-dot { width: 6px; height: 6px; background: currentColor; border-radius: 50%; }
+
+.you-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 2px 9px; border-radius: 6px; font-size: 0.72rem;
+    font-weight: 600; background: rgba(251,191,36,0.1); color: var(--warning);
+    margin-left: 6px;
+}
+
+.roles-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 16px; margin-top: 4px; }
+
+.role-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 24px;
+    display: flex; gap: 18px; align-items: flex-start;
+    transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.role-icon { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+.admin-icon { background: rgba(56,189,248,0.12); color: var(--accent); }
+.staff-icon { background: rgba(148,163,184,0.1);  color: var(--text-muted); }
+
+.role-info h3 { color: var(--text-primary); font-size: 0.95rem; font-weight: 700; margin-bottom: 12px; }
+.role-info ul  { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.role-info ul li { font-size: 0.82rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
+.ci { color: var(--success-text); font-size: 0.72rem; }
+.cx { color: var(--danger-text);  font-size: 0.72rem; }
+</style>
+
+<script>
+let currentUserId = null;
+
+fetch('/get_session_role')
+.then(res => res.json())
+.then(data => { currentUserId = data.user_id; loadUsers(); });
+
+function loadUsers() {
+    fetch('/get_users')
+    .then(res => res.json())
+    .then(data => renderUsers(data))
+    .catch(() => { document.getElementById("usersBody").innerHTML = `<tr><td colspan="5" class="loading-row">Failed to load users.</td></tr>`; });
+}
+
+function renderUsers(data) {
+    const body = document.getElementById("usersBody");
+    if (data.length === 0) { body.innerHTML = `<tr><td colspan="5" class="loading-row">No users found.</td></tr>`; return; }
+    body.innerHTML = "";
+    data.forEach((u, i) => {
+        const isMe      = u.id === currentUserId;
+        const roleClass = u.role === 'admin' ? 'role-admin' : 'role-staff';
+        const roleIcon  = u.role === 'admin' ? 'fa-shield-halved' : 'fa-user';
+        const youBadge  = isMe ? `<span class="you-badge"><i class="fa-solid fa-star"></i> You</span>` : '';
+        const deleteBtn = isMe
+            ? `<button class="delete-btn" disabled title="Cannot delete yourself"><i class="fa-solid fa-trash"></i> Delete</button>`
+            : `<button class="delete-btn" onclick="deleteUser(${u.id},'${u.username}')"><i class="fa-solid fa-trash"></i> Delete</button>`;
+        body.innerHTML += `
+            <tr>
+                <td style="color:var(--text-muted);">${i + 1}</td>
+                <td>
+                    <span class="user-avatar-sm">${u.username[0].toUpperCase()}</span>
+                    <span style="color:var(--text-primary);font-weight:600;">${u.username}</span>
+                    ${youBadge}
+                </td>
+                <td><span class="role-badge ${roleClass}"><i class="fa-solid ${roleIcon}"></i> ${u.role}</span></td>
+                <td><span class="status-active"><span class="status-dot"></span>Active</span></td>
+                <td>${deleteBtn}</td>
+            </tr>`;
+    });
+}
+
+function addUser() {
+    const username = document.getElementById("new_username").value.trim();
+    const password = document.getElementById("new_password").value;
+    const role     = document.getElementById("new_role").value;
+    if (!username) { showMessage("Please enter a username.", "error");  return; }
+    if (!password) { showMessage("Please enter a password.", "error");  return; }
+    if (password.length < 4) { showMessage("Password must be at least 4 characters.", "error"); return; }
+    const btn = document.querySelector(".btn-primary");
+    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating...';
+    fetch('/add_user',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password,role})})
+    .then(res=>res.json())
+    .then(result=>{
+        if(result.message==="Username already exists"){ showMessage("Username already exists. Choose a different one.","error"); }
+        else { showMessage(result.message,"success"); document.getElementById("new_username").value=''; document.getElementById("new_password").value=''; document.getElementById("new_role").value='staff'; loadUsers(); }
+        btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-plus"></i> Create User';
+    })
+    .catch(()=>{ showMessage("Something went wrong.","error"); btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-plus"></i> Create User'; });
+}
+
+function deleteUser(userId, username) {
+    if (!confirm(`Are you sure you want to delete "${username}"?`)) return;
+    fetch(`/delete_user/${userId}`,{method:'DELETE'}).then(res=>res.json()).then(result=>{ showMessage(result.message,"success"); loadUsers(); })
+    .catch(()=>showMessage("Failed to delete user.","error"));
+}
+
+function togglePass(inputId, icon) {
+    const input = document.getElementById(inputId);
+    if (input.type==='password') { input.type='text'; icon.classList.replace('fa-eye','fa-eye-slash'); }
+    else { input.type='password'; icon.classList.replace('fa-eye-slash','fa-eye'); }
+}
+
+function showMessage(msg, type) {
+    const el = document.getElementById("userMessage");
+    el.textContent=msg; el.className="form-message "+type;
+    setTimeout(()=>{ el.className="form-message"; el.textContent=''; },4000);
+}
+</script>
+
+{% endblock %}

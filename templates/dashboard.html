@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1>Welcome back, <span style="color:var(--text-primary);font-weight:700;">{{ session['username'] }}</span></h1>
+        <p class="page-sub">Here is your business overview for today</p>
+    </div>
+</div>
+
+<!-- KPI CARDS -->
+<div class="cards">
+    <div class="card kpi-card">
+        <div class="kpi-icon icon-blue"><i class="fa-solid fa-box-open"></i></div>
+        <div class="kpi-info">
+            <p class="kpi-label">Total Products</p>
+            <p class="kpi-value">{{ total_products }}</p>
+        </div>
+    </div>
+    <div class="card kpi-card">
+        <div class="kpi-icon icon-green"><i class="fa-solid fa-money-bill-wave"></i></div>
+        <div class="kpi-info">
+            <p class="kpi-label">Today's Sales</p>
+            <p class="kpi-value">Rs. {{ "{:,.2f}".format(today_sales) }}</p>
+        </div>
+    </div>
+    <div class="card kpi-card">
+        <div class="kpi-icon icon-purple"><i class="fa-solid fa-calendar-days"></i></div>
+        <div class="kpi-info">
+            <p class="kpi-label">Monthly Sales</p>
+            <p class="kpi-value">Rs. {{ "{:,.2f}".format(monthly_sales) }}</p>
+        </div>
+    </div>
+    <div class="card kpi-card">
+        <div class="kpi-icon icon-orange"><i class="fa-solid fa-chart-line"></i></div>
+        <div class="kpi-info">
+            <p class="kpi-label">Overall Sales</p>
+            <p class="kpi-value">Rs. {{ "{:,.2f}".format(overall_sales) }}</p>
+        </div>
+    </div>
+</div>
+
+<!-- LOW STOCK -->
+<div class="card">
+    <h2><i class="fa-solid fa-triangle-exclamation"></i> Low Stock Alert</h2>
+    {% if low_stock_products %}
+        <div class="stock-list">
+        {% for product in low_stock_products %}
+            <div class="stock-item">
+                <div class="stock-dot"></div>
+                <span class="stock-name">{{ product[0] }}</span>
+                <span class="stock-qty">{{ product[1] }} units remaining</span>
+            </div>
+        {% endfor %}
+        </div>
+    {% else %}
+        <div class="stock-ok-msg">
+            <i class="fa-solid fa-circle-check"></i>
+            All products are sufficiently stocked
+        </div>
+    {% endif %}
+</div>
+
+<!-- CHARTS ROW 1 -->
+<div class="charts-row-2">
+    <div class="card chart-card">
+        <h2><i class="fa-solid fa-chart-bar"></i> Monthly Sales — Current Year</h2>
+        <div class="chart-wrap"><canvas id="monthlyChart"></canvas></div>
+    </div>
+    <div class="card chart-card">
+        <h2><i class="fa-solid fa-arrow-right-arrow-left"></i> Sales vs Purchase</h2>
+        <div class="chart-wrap"><canvas id="salesVsPurchaseChart"></canvas></div>
+    </div>
+</div>
+
+<!-- CHARTS ROW 2 -->
+<div class="charts-row-2">
+    <div class="card chart-card">
+        <h2><i class="fa-solid fa-chart-pie"></i> Sales by Category</h2>
+        <div class="pie-wrap"><canvas id="categoryPieChart"></canvas></div>
+        <div id="pieLegend" class="pie-legend"></div>
+    </div>
+    <div class="card chart-card">
+        <h2><i class="fa-solid fa-trophy"></i> Top Selling Products</h2>
+        <div id="topProducts" class="top-products-wrap">
+            <div class="loading-msg"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* KPI */
+.kpi-card { display:flex; align-items:center; gap:16px; padding:20px 22px; margin-bottom:0; }
+.kpi-icon { width:46px; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
+.icon-blue   { background:rgba(56,189,248,0.12);  color:var(--accent); }
+.icon-green  { background:rgba(34,197,94,0.12);   color:#16a34a; }
+.icon-purple { background:rgba(167,139,250,0.12); color:var(--purple); }
+.icon-orange { background:rgba(251,146,60,0.12);  color:var(--orange); }
+[data-theme="dark"] .icon-green { color:#4ade80; }
+.kpi-label { font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.7px; font-weight:600; margin-bottom:5px; }
+.kpi-value { font-size:1.35rem; font-weight:700; color:var(--text-primary); }
+
+/* Low stock */
+.stock-list { display:flex; flex-direction:column; gap:10px; }
+.stock-item { display:flex; align-items:center; gap:12px; padding:10px 14px; background:rgba(248,113,113,0.05); border:1px solid rgba(248,113,113,0.15); border-radius:8px; }
+.stock-dot  { width:8px; height:8px; border-radius:50%; background:#f87171; flex-shrink:0; box-shadow:0 0 6px rgba(248,113,113,0.4); }
+.stock-name { color:var(--text-primary); font-size:0.88rem; font-weight:500; flex:1; }
+.stock-qty  { color:#dc2626; font-size:0.8rem; font-weight:600; }
+[data-theme="dark"] .stock-qty { color:#f87171; }
+.stock-ok-msg { display:flex; align-items:center; gap:10px; color:#16a34a; font-size:0.88rem; padding:10px 4px; }
+[data-theme="dark"] .stock-ok-msg { color:#4ade80; }
+
+/* Charts */
+.charts-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; }
+@media(max-width:900px){ .charts-row-2{ grid-template-columns:1fr; } }
+.chart-card  { margin-bottom:0; }
+.chart-wrap  { position:relative; height:240px; }
+.pie-wrap    { position:relative; height:200px; display:flex; align-items:center; justify-content:center; }
+
+.pie-legend  { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
+.legend-item { display:flex; align-items:center; gap:6px; font-size:0.78rem; color:var(--text-muted); }
+.legend-dot  { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+
+.top-products-wrap { display:flex; flex-direction:column; gap:14px; max-height:300px; overflow-y:auto; }
+.category-block h4 { font-size:0.7rem; color:var(--accent); text-transform:uppercase; letter-spacing:0.8px; font-weight:700; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+.product-row { display:flex; align-items:center; padding:6px 0; border-bottom:1px solid var(--row-border); }
+.product-row:last-child { border-bottom:none; }
+.product-rank { width:22px; height:22px; border-radius:6px; background:var(--bg-table-head); color:var(--text-muted); font-size:0.72rem; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-right:10px; }
+.product-rank.rank-1 { background:rgba(251,191,36,0.15); color:var(--warning); }
+.product-rank.rank-2 { background:rgba(148,163,184,0.15); color:var(--text-muted); }
+.product-rank.rank-3 { background:rgba(180,83,9,0.15);   color:var(--orange); }
+.product-name-text { color:var(--text-second); font-size:0.85rem; flex:1; }
+.product-sold { font-size:0.78rem; font-weight:600; background:var(--accent-glow); color:var(--accent); padding:2px 9px; border-radius:6px; }
+.loading-msg  { color:var(--text-muted); font-size:0.88rem; padding:20px 0; display:flex; align-items:center; gap:8px; }
+.no-data-msg  { color:var(--text-muted); font-size:0.85rem; text-align:center; padding:40px 0; }
+</style>
+
+<script>
+const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// Detect current theme for chart colors
+function getThemeColors() {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    return {
+        gridColor: isDark ? 'rgba(51,65,85,0.4)' : 'rgba(203,213,225,0.6)',
+        tickColor: isDark ? '#475569' : '#64748b',
+        tooltipBg: isDark ? '#1e293b' : '#ffffff',
+        tooltipBorder: isDark ? '#334155' : '#e2e8f0',
+        tooltipTitle: isDark ? '#94a3b8' : '#64748b',
+        tooltipBody: isDark ? '#f1f5f9' : '#0f172a',
+    };
+}
+
+function buildScales(tc) {
+    return {
+        x: { grid: { color: tc.gridColor }, ticks: { color: tc.tickColor, font: { size: 11 } } },
+        y: { grid: { color: tc.gridColor }, ticks: { color: tc.tickColor, font: { size: 11 }, callback: val => 'Rs.' + val.toLocaleString('en-IN') }, beginAtZero: true }
+    };
+}
+
+function buildTooltip(tc, labelFn) {
+    return {
+        backgroundColor: tc.tooltipBg,
+        borderColor: tc.tooltipBorder,
+        borderWidth: 1,
+        titleColor: tc.tooltipTitle,
+        bodyColor: tc.tooltipBody,
+        padding: 10,
+        callbacks: { label: labelFn }
+    };
+}
+
+// ── 1. MONTHLY SALES ──
+fetch('/monthly_sales_data')
+.then(res => res.json())
+.then(data => {
+    const tc = getThemeColors();
+    const monthMap = {};
+    data.forEach(row => { monthMap[row[0]] = row[1]; });
+    const values = Array.from({length:12}, (_,i) => monthMap[i+1] || 0);
+    new Chart(document.getElementById("monthlyChart"), {
+        type: 'bar',
+        data: { labels: monthNames, datasets: [{ label:'Sales', data:values, backgroundColor:'rgba(56,189,248,0.2)', borderColor:'#38bdf8', borderWidth:2, borderRadius:6, borderSkipped:false }] },
+        options: { responsive:true, maintainAspectRatio:false, plugins: { legend:{display:false}, tooltip: buildTooltip(tc, ctx => ` Rs. ${ctx.parsed.y.toLocaleString('en-IN',{minimumFractionDigits:2})}`) }, scales: buildScales(tc) }
+    });
+});
+
+// ── 2. SALES VS PURCHASE ──
+fetch('/sales_vs_purchase')
+.then(res => res.json())
+.then(data => {
+    const tc = getThemeColors();
+    const labels = data.map(d => monthNames[d.month-1]);
+    new Chart(document.getElementById("salesVsPurchaseChart"), {
+        type: 'bar',
+        data: { labels, datasets: [
+            { label:'Sales',    data:data.map(d=>d.sales),    backgroundColor:'rgba(74,222,128,0.2)',  borderColor:'#4ade80', borderWidth:2, borderRadius:5, borderSkipped:false },
+            { label:'Purchase', data:data.map(d=>d.purchase), backgroundColor:'rgba(251,146,60,0.2)',  borderColor:'#fb923c', borderWidth:2, borderRadius:5, borderSkipped:false }
+        ]},
+        options: { responsive:true, maintainAspectRatio:false,
+            plugins: { legend: { display:true, labels:{ color:tc.tickColor, font:{size:11}, boxWidth:12, boxHeight:12, padding:16 }},
+                tooltip: buildTooltip(tc, ctx => ` ${ctx.dataset.label}: Rs. ${ctx.parsed.y.toLocaleString('en-IN',{minimumFractionDigits:2})}`) },
+            scales: buildScales(tc) }
+    });
+});
+
+// ── 3. CATEGORY PIE ──
+const pieColors = ['#38bdf8','#4ade80','#a78bfa','#fb923c','#f472b6','#fbbf24','#34d399','#60a5fa'];
+fetch('/category_sales')
+.then(res => res.json())
+.then(data => {
+    const tc = getThemeColors();
+    if (data.length === 0) {
+        document.getElementById("categoryPieChart").closest('.pie-wrap').innerHTML = `<p class="no-data-msg">No sales data yet</p>`; return;
+    }
+    const values = data.map(d => d.total);
+    const colors = data.map((_,i) => pieColors[i % pieColors.length]);
+    new Chart(document.getElementById("categoryPieChart"), {
+        type: 'doughnut',
+        data: { labels: data.map(d=>d.category), datasets: [{ data:values, backgroundColor:colors.map(c=>c+'33'), borderColor:colors, borderWidth:2, hoverOffset:6 }] },
+        options: { responsive:true, maintainAspectRatio:false, cutout:'65%',
+            plugins: { legend:{display:false}, tooltip: buildTooltip(tc, ctx => ` Rs. ${ctx.parsed.toLocaleString('en-IN',{minimumFractionDigits:2})}`) } }
+    });
+    const legend = document.getElementById("pieLegend");
+    const total  = values.reduce((a,b)=>a+b,0);
+    data.forEach((d,i) => {
+        const pct = ((d.total/total)*100).toFixed(1);
+        legend.innerHTML += `<div class="legend-item"><div class="legend-dot" style="background:${pieColors[i%pieColors.length]}"></div><span>${d.category} (${pct}%)</span></div>`;
+    });
+});
+
+// ── 4. TOP PRODUCTS ──
+fetch('/top_products')
+.then(res => res.json())
+.then(data => {
+    const container = document.getElementById("topProducts");
+    if (data.length === 0) { container.innerHTML = `<p class="no-data-msg">No sales data yet.</p>`; return; }
+    const categoryMap = {};
+    data.forEach(row => {
+        if (!categoryMap[row[0]]) categoryMap[row[0]] = [];
+        categoryMap[row[0]].push({ product:row[1], total:row[2] });
+    });
+    container.innerHTML = "";
+    for (let cat in categoryMap) {
+        const items = categoryMap[cat].sort((a,b)=>b.total-a.total).slice(0,5);
+        let rows = '';
+        items.forEach((item,i) => {
+            const rankClass = i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'';
+            rows += `<div class="product-row"><span class="product-rank ${rankClass}">${i+1}</span><span class="product-name-text">${item.product}</span><span class="product-sold">${item.total} sold</span></div>`;
+        });
+        container.innerHTML += `<div class="category-block"><h4>${cat}</h4>${rows}</div>`;
+    }
+});
+</script>
+
+{% endblock %}

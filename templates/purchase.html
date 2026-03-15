@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1><i class="fa-solid fa-cart-flatbed page-icon"></i> Purchase</h1>
+    <p class="page-sub">Record stock purchases from suppliers and track purchase history</p>
+</div>
+
+<div class="card form-card">
+    <h2><i class="fa-solid fa-file-invoice"></i> New Purchase Bill</h2>
+    <div class="form-row">
+        <div class="input-wrap">
+            <label>Supplier</label>
+            <select id="supplier_id">
+                <option value="">-- Select Supplier --</option>
+            </select>
+        </div>
+    </div>
+    <div class="items-header">
+        <span class="items-title"><i class="fa-solid fa-boxes-stacked"></i> Items</span>
+        <div style="display:flex;gap:8px;">
+            <button class="btn-new-product" onclick="openNewProductModal()">
+                <i class="fa-solid fa-cube"></i> New Product
+            </button>
+            <button class="btn-add-item" onclick="addItemRow()">
+                <i class="fa-solid fa-plus"></i> Add Item
+            </button>
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Current Stock</th>
+                    <th>Purchase Price (Rs.)</th>
+                    <th>Quantity</th>
+                    <th>Subtotal</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="itemsBody"></tbody>
+        </table>
+    </div>
+    <div class="total-bar">
+        <span class="total-label">Total Amount</span>
+        <span id="totalAmount" class="total-value">Rs. 0.00</span>
+    </div>
+    <div class="form-actions" style="margin-top:16px;">
+        <button class="btn-primary" id="recordBtn" onclick="submitPurchase()">
+            <i class="fa-solid fa-check"></i> Record Purchase
+        </button>
+        <button class="btn-secondary" onclick="resetPurchaseForm()">
+            <i class="fa-solid fa-xmark"></i> Clear
+        </button>
+    </div>
+    <div id="purchaseMessage" class="form-message"></div>
+</div>
+
+<div class="card">
+    <h2><i class="fa-solid fa-truck"></i> Add New Supplier</h2>
+    <div class="form-grid">
+        <div class="input-wrap">
+            <label>Supplier Name</label>
+            <input type="text" id="supplier_name" placeholder="e.g. ABC Traders">
+        </div>
+        <div class="input-wrap">
+            <label>Contact Number</label>
+            <input type="text" id="supplier_contact" placeholder="e.g. 9876543210">
+        </div>
+        <div class="input-wrap">
+            <label>Email Address</label>
+            <input type="email" id="supplier_email" placeholder="e.g. abc@traders.com">
+        </div>
+    </div>
+    <div class="form-actions">
+        <button class="btn-primary" onclick="addSupplier()">
+            <i class="fa-solid fa-plus"></i> Add Supplier
+        </button>
+    </div>
+    <div id="supplierMessage" class="form-message"></div>
+</div>
+
+<div class="card">
+    <div class="history-header">
+        <h2><i class="fa-solid fa-clock-rotate-left"></i> Purchase History</h2>
+        <div class="search-wrap">
+            <i class="fa-solid fa-magnifying-glass search-icon"></i>
+            <input type="text" id="purchaseSearch" placeholder="Search by supplier..." oninput="filterPurchases()">
+        </div>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Bill ID</th>
+                    <th>Supplier</th>
+                    <th>Total Amount</th>
+                    <th>Date & Time</th>
+                </tr>
+            </thead>
+            <tbody id="purchaseBody">
+                <tr><td colspan="5" class="loading-row">Loading purchases...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- NEW PRODUCT MODAL -->
+<div id="productModal" class="modal-overlay" onclick="closeModalOutside(event)">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-cube"></i> Add New Product</h3>
+            <button class="modal-close" onclick="closeNewProductModal()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <div class="form-grid">
+                <div class="input-wrap">
+                    <label>Product Name</label>
+                    <input type="text" id="m_product_name" placeholder="e.g. Samsung TV">
+                </div>
+                <div class="input-wrap">
+                    <label>Category</label>
+                    <select id="m_category_id">
+                        <option value="">-- Select Category --</option>
+                    </select>
+                </div>
+                <div class="input-wrap">
+                    <label>Cost Price (Rs.)</label>
+                    <input type="number" id="m_cost_price" placeholder="0.00" step="0.01">
+                </div>
+                <div class="input-wrap">
+                    <label>Selling Price (Rs.)</label>
+                    <input type="number" id="m_selling_price" placeholder="0.00" step="0.01">
+                </div>
+                <div class="input-wrap">
+                    <label>Initial Stock</label>
+                    <input type="number" id="m_stock_quantity" placeholder="0" value="0">
+                </div>
+                <div class="input-wrap">
+                    <label>Reorder Level</label>
+                    <input type="number" id="m_reorder_level" placeholder="5" value="5">
+                </div>
+            </div>
+            <div id="modalMessage" class="form-message"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeNewProductModal()"><i class="fa-solid fa-xmark"></i> Cancel</button>
+            <button class="btn-primary" id="modalSaveBtn" onclick="saveNewProduct()"><i class="fa-solid fa-plus"></i> Add Product</button>
+        </div>
+    </div>
+</div>
+
+<style>
+.btn-new-product {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 16px;
+    background: rgba(167,139,250,0.1); color: var(--purple);
+    border: 1px solid rgba(167,139,250,0.25); border-radius: 7px;
+    font-weight: 600; font-size: 0.82rem; cursor: pointer; transition: all 0.2s;
+}
+.btn-new-product:hover { background: rgba(167,139,250,0.2); }
+
+/* MODAL */
+.modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(4px);
+    z-index: 1000; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-overlay.open { display: flex; }
+
+.modal-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 16px; width: 100%; max-width: 620px;
+    animation: modalIn 0.25s ease; overflow: hidden;
+}
+
+@keyframes modalIn {
+    from { opacity: 0; transform: scale(0.96) translateY(10px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 24px; border-bottom: 1px solid var(--border);
+}
+.modal-header h3 { color: var(--text-primary); font-size: 1rem; display: flex; align-items: center; gap: 9px; }
+.modal-header h3 i { color: var(--purple); }
+
+.modal-close {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: rgba(248,113,113,0.1); color: var(--danger);
+    border: none; cursor: pointer; font-size: 0.85rem;
+    display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+}
+.modal-close:hover { background: rgba(248,113,113,0.25); }
+
+.modal-body   { padding: 24px; }
+.modal-footer {
+    display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+    padding: 16px 24px; border-top: 1px solid var(--border);
+}
+
+.supplier-cell { color: var(--text-primary); font-weight: 500; }
+</style>
+
+<script>
+let allProducts  = [];
+let allPurchases = [];
+let rowCount     = 0;
+
+loadSuppliers();
+loadCategories();
+loadPurchases();
+
+fetch('/products')
+.then(res => res.json())
+.then(data => {
+    allProducts = data;
+    document.getElementById("itemsBody").innerHTML = '';
+    rowCount = 0;
+    addItemRow();
+});
+
+function loadSuppliers() {
+    fetch('/suppliers').then(res => res.json()).then(data => {
+        const select = document.getElementById("supplier_id");
+        select.innerHTML = `<option value="">-- Select Supplier --</option>`;
+        data.forEach(s => { select.innerHTML += `<option value="${s.supplier_id}">${s.supplier_name}</option>`; });
+    });
+}
+
+function loadCategories() {
+    fetch('/categories').then(res => res.json()).then(data => {
+        const select = document.getElementById("m_category_id");
+        select.innerHTML = `<option value="">-- Select Category --</option>`;
+        data.forEach(c => { select.innerHTML += `<option value="${c.category_id}">${c.category_name}</option>`; });
+    });
+}
+
+function refreshProducts(callback) {
+    fetch('/products').then(res => res.json()).then(data => {
+        allProducts = data;
+        document.querySelectorAll("#itemsBody tr").forEach(row => {
+            const select = row.querySelector("select");
+            if (!select) return;
+            const currentVal = select.value;
+            let options = `<option value="">-- Select Product --</option>`;
+            allProducts.forEach(p => {
+                options += `<option value="${p.product_id}" data-stock="${p.stock_quantity}" ${p.product_id == currentVal ? 'selected' : ''}>${p.product_name}</option>`;
+            });
+            select.innerHTML = options;
+        });
+        if (callback) callback();
+    });
+}
+
+function addItemRow() {
+    rowCount++;
+    const rowId = `row_${rowCount}`;
+    let options = `<option value="">-- Select Product --</option>`;
+    allProducts.forEach(p => { options += `<option value="${p.product_id}" data-stock="${p.stock_quantity}">${p.product_name}</option>`; });
+    const tr = document.createElement('tr');
+    tr.id = rowId;
+    tr.innerHTML = `
+        <td><select onchange="onProductChange('${rowId}')">${options}</select></td>
+        <td id="${rowId}_stock" style="color:var(--text-muted);">—</td>
+        <td><input type="number" id="${rowId}_price" min="0" step="0.01" placeholder="0.00" oninput="updateSubtotal('${rowId}')" style="width:110px;"></td>
+        <td><input type="number" id="${rowId}_qty" min="1" value="1" oninput="updateSubtotal('${rowId}')" style="width:80px;"></td>
+        <td id="${rowId}_subtotal" class="subtotal-cell">Rs. 0.00</td>
+        <td><button class="remove-btn" onclick="removeRow('${rowId}')"><i class="fa-solid fa-xmark"></i></button></td>`;
+    document.getElementById("itemsBody").appendChild(tr);
+}
+
+function onProductChange(rowId) {
+    const row = document.getElementById(rowId);
+    const select = row.querySelector("select");
+    const option = select.options[select.selectedIndex];
+    const stock  = parseInt(option.dataset.stock) || 0;
+    const stockEl = document.getElementById(`${rowId}_stock`);
+    stockEl.textContent = stock;
+    stockEl.className   = stock <= 5 ? 'stock-cell-low' : 'stock-cell-ok';
+    updateSubtotal(rowId);
+}
+
+function updateSubtotal(rowId) {
+    const price = parseFloat(document.getElementById(`${rowId}_price`).value) || 0;
+    const qty   = parseInt(document.getElementById(`${rowId}_qty`).value)     || 0;
+    document.getElementById(`${rowId}_subtotal`).textContent = `Rs. ${(price * qty).toFixed(2)}`;
+    updateTotal();
+}
+
+function updateTotal() {
+    let total = 0;
+    document.querySelectorAll("#itemsBody tr").forEach(row => {
+        const el = row.querySelector("td.subtotal-cell");
+        if (el) total += parseFloat(el.textContent.replace('Rs.','').trim()) || 0;
+    });
+    document.getElementById("totalAmount").textContent = `Rs. ${total.toFixed(2)}`;
+}
+
+function removeRow(rowId) {
+    if (document.querySelectorAll("#itemsBody tr").length <= 1) { showMessage("purchaseMessage","At least one item is required.","error"); return; }
+    document.getElementById(rowId)?.remove(); updateTotal();
+}
+
+function submitPurchase() {
+    const supplier_id = document.getElementById("supplier_id").value;
+    if (!supplier_id) { showMessage("purchaseMessage","Please select a supplier.","error"); return; }
+    const rows = document.querySelectorAll("#itemsBody tr");
+    let items = [], valid = true;
+    rows.forEach(row => {
+        const select = row.querySelector("select");
+        const inputs = row.querySelectorAll("input[type='number']");
+        const priceEl = inputs[0]; const qtyEl = inputs[1];
+        if (!select||!priceEl||!qtyEl) return;
+        const product_id = select.value;
+        const price = parseFloat(priceEl.value);
+        const quantity = parseInt(qtyEl.value);
+        if (!product_id)        { showMessage("purchaseMessage","Please select a product for all rows.","error"); valid=false; return; }
+        if (!price||price<=0)   { showMessage("purchaseMessage","Please enter a valid purchase price.","error"); valid=false; return; }
+        if (!quantity||quantity<=0){ showMessage("purchaseMessage","Please enter a valid quantity.","error"); valid=false; return; }
+        items.push({ product_id, price, quantity });
+    });
+    if (!valid||items.length===0) return;
+    const btn = document.getElementById("recordBtn");
+    btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Recording...';
+    fetch('/create_purchase',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({supplier_id,items})})
+    .then(res=>res.json())
+    .then(result => { showMessage("purchaseMessage",`Purchase recorded. Bill #${result.bill_id}`,"success"); resetPurchaseForm(); loadPurchases(); })
+    .catch(()=>{ showMessage("purchaseMessage","Something went wrong.","error"); btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-check"></i> Record Purchase'; });
+}
+
+function resetPurchaseForm() {
+    document.getElementById("supplier_id").value=''; document.getElementById("itemsBody").innerHTML='';
+    document.getElementById("totalAmount").textContent='Rs. 0.00'; rowCount=0;
+    const btn=document.getElementById("recordBtn"); btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-check"></i> Record Purchase';
+    refreshProducts(()=>addItemRow());
+}
+
+function addSupplier() {
+    const supplier_name=document.getElementById("supplier_name").value.trim();
+    const supplier_contact=document.getElementById("supplier_contact").value.trim();
+    const supplier_email=document.getElementById("supplier_email").value.trim();
+    if (!supplier_name){showMessage("supplierMessage","Please enter a supplier name.","error");return;}
+    fetch('/add_supplier',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({supplier_name,contact:supplier_contact,email:supplier_email})})
+    .then(res=>res.json())
+    .then(result=>{
+        showMessage("supplierMessage",result.message,"success");
+        document.getElementById("supplier_name").value=''; document.getElementById("supplier_contact").value=''; document.getElementById("supplier_email").value='';
+        loadSuppliers();
+    })
+    .catch(()=>showMessage("supplierMessage","Failed to add supplier.","error"));
+}
+
+function loadPurchases() {
+    fetch('/get_purchases').then(res=>res.json()).then(data=>{allPurchases=data;renderPurchases(data);})
+    .catch(()=>{ document.getElementById("purchaseBody").innerHTML=`<tr><td colspan="5" class="loading-row">Failed to load purchases.</td></tr>`; });
+}
+
+function renderPurchases(data) {
+    const body=document.getElementById("purchaseBody");
+    if(data.length===0){body.innerHTML=`<tr><td colspan="5" class="loading-row">No purchases recorded yet.</td></tr>`;return;}
+    body.innerHTML="";
+    data.forEach((p,i)=>{
+        body.innerHTML+=`<tr>
+            <td style="color:var(--text-muted);">${i+1}</td>
+            <td><span class="bill-badge">BILL-${String(p.bill_id).padStart(4,'0')}</span></td>
+            <td class="supplier-cell">${p.supplier_name}</td>
+            <td class="amount-cell">Rs. ${parseFloat(p.total_amount).toFixed(2)}</td>
+            <td class="date-cell">${p.bill_date}</td>
+        </tr>`;
+    });
+}
+
+function filterPurchases() {
+    const query=document.getElementById("purchaseSearch").value.toLowerCase().trim();
+    if(query===''){renderPurchases(allPurchases);return;}
+    const filtered=allPurchases.filter(p=>(p.supplier_name||'').toLowerCase().includes(query));
+    if(filtered.length===0){ document.getElementById("purchaseBody").innerHTML=`<tr><td colspan="5" class="loading-row">No purchases found for "${query}"</td></tr>`; }
+    else{ renderPurchases(filtered); }
+}
+
+function openNewProductModal() { document.getElementById("productModal").classList.add("open"); document.getElementById("m_product_name").focus(); }
+
+function closeNewProductModal() {
+    document.getElementById("productModal").classList.remove("open");
+    ['m_product_name','m_cost_price','m_selling_price'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById("m_category_id").value=''; document.getElementById("m_stock_quantity").value='0'; document.getElementById("m_reorder_level").value='5';
+    const msg=document.getElementById("modalMessage"); msg.className="form-message"; msg.textContent='';
+}
+
+function closeModalOutside(e) { if(e.target.id==='productModal') closeNewProductModal(); }
+
+function saveNewProduct() {
+    const product_name=document.getElementById("m_product_name").value.trim();
+    const category_id=document.getElementById("m_category_id").value;
+    const cost_price=document.getElementById("m_cost_price").value;
+    const selling_price=document.getElementById("m_selling_price").value;
+    const stock_quantity=document.getElementById("m_stock_quantity").value||0;
+    const reorder_level=document.getElementById("m_reorder_level").value||5;
+    if(!product_name){showModalMsg("Please enter a product name.","error");return;}
+    if(!category_id) {showModalMsg("Please select a category.","error");return;}
+    if(!cost_price)  {showModalMsg("Please enter cost price.","error");return;}
+    if(!selling_price){showModalMsg("Please enter selling price.","error");return;}
+    const btn=document.getElementById("modalSaveBtn"); btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+    fetch('/add_product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_name,category_id,cost_price,selling_price,stock_quantity,reorder_level})})
+    .then(res=>res.json())
+    .then(result=>{
+        showModalMsg(result.message,"success"); btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-plus"></i> Add Product';
+        refreshProducts(()=>{ setTimeout(()=>{ closeNewProductModal(); showMessage("purchaseMessage",`Product "${product_name}" added and available in dropdown.`,"success"); },800); });
+    })
+    .catch(()=>{ showModalMsg("Something went wrong.","error"); btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-plus"></i> Add Product'; });
+}
+
+function showModalMsg(msg,type){ const el=document.getElementById("modalMessage"); el.textContent=msg; el.className="form-message "+type; }
+
+function showMessage(elementId,msg,type){
+    const el=document.getElementById(elementId); el.textContent=msg; el.className="form-message "+type;
+    setTimeout(()=>{el.className="form-message";el.textContent='';},5000);
+}
+</script>
+
+{% endblock %}

@@ -1,0 +1,16 @@
+# Virtual environment
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Config file (contains your password)
+config.py
+
+# VS Code settings
+.vscode/
+
+# Environment variables
+.env

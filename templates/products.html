@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1><i class="fa-solid fa-box-open page-icon"></i> Products Management</h1>
+    <p class="page-sub">Manage your inventory — add, edit, and track all products</p>
+</div>
+
+<div class="card form-card">
+    <h2 id="formTitle"><i class="fa-solid fa-plus-circle"></i> Add New Product</h2>
+    <div class="form-grid">
+        <div class="input-wrap">
+            <label>Product Name</label>
+            <input type="text" id="product_name" placeholder="e.g. Samsung TV 55 inch">
+        </div>
+        <div class="input-wrap">
+            <label>Category</label>
+            <select id="category_id">
+                <option value="">-- Select Category --</option>
+                {% for cat in categories %}
+                <option value="{{ cat[0] }}">{{ cat[1] }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="input-wrap">
+            <label>Cost Price (Rs.)</label>
+            <input type="number" id="cost_price" placeholder="0.00" step="0.01">
+        </div>
+        <div class="input-wrap">
+            <label>Selling Price (Rs.)</label>
+            <input type="number" id="selling_price" placeholder="0.00" step="0.01">
+        </div>
+        <div class="input-wrap">
+            <label>Stock Quantity</label>
+            <input type="number" id="stock_quantity" placeholder="0">
+        </div>
+        <div class="input-wrap">
+            <label>Reorder Level</label>
+            <input type="number" id="reorder_level" placeholder="5" value="5">
+        </div>
+    </div>
+    <div class="form-actions">
+        <button class="btn-primary" id="submitBtn" onclick="submitProduct()">
+            <i class="fa-solid fa-plus"></i> Add Product
+        </button>
+        <button class="btn-secondary" id="cancelBtn" onclick="resetForm()" style="display:none">
+            <i class="fa-solid fa-xmark"></i> Cancel
+        </button>
+    </div>
+    <div id="formMessage" class="form-message"></div>
+</div>
+
+<div class="card">
+    <div class="search-wrap">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="searchInput" placeholder="Search products by name or category..." oninput="filterProducts()">
+    </div>
+</div>
+
+<div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+        <h2 style="margin:0;"><i class="fa-solid fa-table-list"></i> All Products</h2>
+        <span id="productCount" class="count-badge"></span>
+    </div>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Product Name</th>
+                    <th>Category</th>
+                    <th>Cost Price</th>
+                    <th>Selling Price</th>
+                    <th>Profit / Unit</th>
+                    <th>Stock</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="productBody">
+                <tr><td colspan="8" class="loading-row">Loading products...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+.search-wrap { margin: 0; }
+.search-wrap input { width: 100%; }
+.count-badge {
+    background: var(--accent-glow);
+    color: var(--accent);
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+</style>
+
+<script>
+let allProducts   = [];
+let editMode      = false;
+let editProductId = null;
+let userRole      = 'staff';
+
+fetch('/get_session_role')
+.then(res => res.json())
+.then(data => { userRole = data.role; loadProducts(); })
+.catch(() => loadProducts());
+
+function loadProducts() {
+    fetch('/products')
+    .then(res => res.json())
+    .then(data => { allProducts = data; renderProducts(data); })
+    .catch(() => {
+        document.getElementById("productBody").innerHTML =
+            `<tr><td colspan="8" class="loading-row">Failed to load products.</td></tr>`;
+    });
+}
+
+function renderProducts(data) {
+    const body = document.getElementById("productBody");
+    const countEl = document.getElementById("productCount");
+    if (countEl) countEl.textContent = `${data.length} products`;
+
+    if (data.length === 0) {
+        body.innerHTML = `<tr><td colspan="8" class="loading-row">No products found.</td></tr>`; return;
+    }
+    body.innerHTML = "";
+    data.forEach((p, i) => {
+        const profit      = (parseFloat(p.selling_price) - parseFloat(p.cost_price)).toFixed(2);
+        const profitClass = profit >= 0 ? 'profit-pos' : 'profit-neg';
+        const stockClass  = p.stock_quantity === 0 ? 'stock-low' : p.stock_quantity <= p.reorder_level ? 'stock-warn' : 'stock-ok';
+        const stockLabel  = p.stock_quantity === 0 ? '<i class="fa-solid fa-triangle-exclamation"></i> Out of Stock' : p.stock_quantity;
+        const safeName    = (p.product_name || '').replace(/'/g, "\\'");
+
+        const actionBtns = userRole === 'admin' ? `
+            <button class="edit-btn" onclick="editProduct(${p.product_id},'${safeName}','${p.category_id||''}',${p.cost_price},${p.selling_price},${p.stock_quantity},${p.reorder_level})">
+                <i class="fa-solid fa-pen"></i> Edit
+            </button>
+            <button class="delete-btn" onclick="deleteProduct(${p.product_id})">
+                <i class="fa-solid fa-trash"></i> Delete
+            </button>
+        ` : `<span style="color:var(--text-faint);font-size:0.8rem;">View only</span>`;
+
+        body.innerHTML += `
+            <tr>
+                <td style="color:var(--text-muted);">${i + 1}</td>
+                <td style="color:var(--text-primary);font-weight:600;">${p.product_name}</td>
+                <td><span class="category-tag">${p.category_name || '—'}</span></td>
+                <td>Rs. ${parseFloat(p.cost_price).toFixed(2)}</td>
+                <td>Rs. ${parseFloat(p.selling_price).toFixed(2)}</td>
+                <td><span class="profit-badge ${profitClass}">Rs. ${profit}</span></td>
+                <td class="${stockClass}">${stockLabel}</td>
+                <td>${actionBtns}</td>
+            </tr>`;
+    });
+}
+
+function filterProducts() {
+    const query = document.getElementById("searchInput").value.toLowerCase().trim();
+    if (query === '') { renderProducts(allProducts); return; }
+    const filtered = allProducts.filter(p =>
+        (p.product_name||'').toLowerCase().includes(query) ||
+        (p.category_name||'').toLowerCase().includes(query)
+    );
+    if (filtered.length === 0) {
+        document.getElementById("productBody").innerHTML =
+            `<tr><td colspan="8" class="loading-row">No products match "${query}"</td></tr>`;
+    } else { renderProducts(filtered); }
+}
+
+function submitProduct() {
+    const product_name   = document.getElementById("product_name").value.trim();
+    const category_id    = document.getElementById("category_id").value;
+    const cost_price     = document.getElementById("cost_price").value;
+    const selling_price  = document.getElementById("selling_price").value;
+    const stock_quantity = document.getElementById("stock_quantity").value;
+    const reorder_level  = document.getElementById("reorder_level").value || 5;
+
+    if (!product_name)   { showMessage("Please enter a product name.", "error");  return; }
+    if (!category_id)    { showMessage("Please select a category.", "error");     return; }
+    if (!cost_price)     { showMessage("Please enter cost price.", "error");      return; }
+    if (!selling_price)  { showMessage("Please enter selling price.", "error");   return; }
+    if (!stock_quantity) { showMessage("Please enter stock quantity.", "error");  return; }
+
+    const data   = { product_name, category_id, cost_price, selling_price, stock_quantity, reorder_level };
+    const url    = editMode ? `/update_product/${editProductId}` : '/add_product';
+    const method = editMode ? 'PUT' : 'POST';
+
+    const btn = document.getElementById("submitBtn");
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+    fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(data) })
+    .then(res => {
+        if (res.status === 403) { showMessage("Only admins can add or edit products.", "error"); resetSubmitBtn(); return null; }
+        if (!res.ok)            { showMessage("Server error. Please try again.", "error");       resetSubmitBtn(); return null; }
+        return res.json();
+    })
+    .then(result => {
+        if (!result) return;
+        showMessage(result.message, "success");
+        resetForm(); loadProducts();
+    })
+    .catch(() => { showMessage("Something went wrong.", "error"); resetSubmitBtn(); });
+}
+
+function resetSubmitBtn() {
+    const btn = document.getElementById("submitBtn");
+    btn.disabled = false;
+    btn.innerHTML = editMode ? '<i class="fa-solid fa-floppy-disk"></i> Update Product' : '<i class="fa-solid fa-plus"></i> Add Product';
+}
+
+function editProduct(id, name, category_id, cost, selling, stock, reorder) {
+    document.getElementById("product_name").value   = name;
+    document.getElementById("category_id").value    = category_id;
+    document.getElementById("cost_price").value     = cost;
+    document.getElementById("selling_price").value  = selling;
+    document.getElementById("stock_quantity").value = stock;
+    document.getElementById("reorder_level").value  = reorder;
+    editMode = true; editProductId = id;
+    document.getElementById("submitBtn").innerHTML     = '<i class="fa-solid fa-floppy-disk"></i> Update Product';
+    document.getElementById("submitBtn").disabled      = false;
+    document.getElementById("cancelBtn").style.display = "inline-flex";
+    document.getElementById("formTitle").innerHTML     = '<i class="fa-solid fa-pen"></i> Edit Product';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function deleteProduct(id) {
+    if (!confirm("Are you sure you want to delete this product?")) return;
+    fetch(`/delete_product/${id}`, { method: 'DELETE' })
+    .then(res => { if (res.status === 403) { showMessage("Only admins can delete products.", "error"); return null; } return res.json(); })
+    .then(result => { if (!result) return; showMessage(result.message, "success"); loadProducts(); })
+    .catch(() => showMessage("Delete failed.", "error"));
+}
+
+function resetForm() {
+    ['product_name','cost_price','selling_price','stock_quantity'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById("category_id").value    = '';
+    document.getElementById("reorder_level").value  = '5';
+    editMode = false; editProductId = null;
+    document.getElementById("submitBtn").innerHTML     = '<i class="fa-solid fa-plus"></i> Add Product';
+    document.getElementById("submitBtn").disabled      = false;
+    document.getElementById("cancelBtn").style.display = "none";
+    document.getElementById("formTitle").innerHTML     = '<i class="fa-solid fa-plus-circle"></i> Add New Product';
+    const msg = document.getElementById("formMessage");
+    msg.className = "form-message"; msg.textContent = '';
+}
+
+function showMessage(msg, type) {
+    const el = document.getElementById("formMessage");
+    el.textContent = msg; el.className = "form-message " + type;
+    setTimeout(() => { el.className = "form-message"; el.textContent = ''; }, 4000);
+}
+</script>
+
+{% endblock %}

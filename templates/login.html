@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Smart ERP | Login</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <style>
+        *, *::before, *::after {
+            margin: 0; padding: 0; box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0f172a;
+            overflow: hidden;
+        }
+
+        /* ── BACKGROUND GRID ── */
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(56,189,248,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(56,189,248,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: 0;
+        }
+
+        /* ── GLOW ORBS ── */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .orb-1 {
+            width: 400px; height: 400px;
+            background: rgba(56,189,248,0.07);
+            top: -100px; left: -100px;
+        }
+
+        .orb-2 {
+            width: 300px; height: 300px;
+            background: rgba(167,139,250,0.05);
+            bottom: -80px; right: -80px;
+        }
+
+        /* ── LOGIN CARD ── */
+        .login-card {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 400px;
+            margin: 20px;
+            background: #1a2436;
+            border: 1px solid #1e293b;
+            border-radius: 20px;
+            padding: 40px;
+            animation: slideUp 0.5s ease forwards;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(24px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── LOGO SECTION ── */
+        .login-logo-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .login-logo-wrap img {
+            width: 56px;
+            height: 56px;
+            object-fit: contain;
+            margin-bottom: 14px;
+        }
+
+        .login-brand {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            letter-spacing: 0.3px;
+        }
+
+        .login-tagline {
+            font-size: 0.78rem;
+            color: #38bdf8;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-top: 4px;
+        }
+
+        /* ── DIVIDER ── */
+        .login-divider {
+            height: 1px;
+            background: #1e293b;
+            margin-bottom: 28px;
+        }
+
+        /* ── FORM ── */
+        .login-form { display: flex; flex-direction: column; gap: 18px; }
+
+        .field-wrap { display: flex; flex-direction: column; gap: 6px; }
+
+        .field-wrap label {
+            font-size: 0.72rem;
+            color: #475569;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.7px;
+        }
+
+        .field-inner { position: relative; }
+
+        .field-inner .field-icon {
+            position: absolute;
+            left: 14px; top: 50%;
+            transform: translateY(-50%);
+            color: #334155;
+            font-size: 0.85rem;
+            pointer-events: none;
+            transition: color 0.2s;
+        }
+
+        .field-inner input {
+            width: 100%;
+            padding: 11px 14px 11px 40px;
+            background: #0f172a;
+            border: 1px solid #2d3f55;
+            border-radius: 10px;
+            color: #e2e8f0;
+            font-size: 0.9rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            font-family: inherit;
+        }
+
+        .field-inner input:focus {
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 3px rgba(56,189,248,0.1);
+        }
+
+        .field-inner input:focus + .field-icon,
+        .field-inner input:focus ~ .field-icon {
+            color: #38bdf8;
+        }
+
+        .field-inner input::placeholder { color: #334155; }
+
+        /* Eye toggle for password */
+        .eye-btn {
+            position: absolute;
+            right: 13px; top: 50%;
+            transform: translateY(-50%);
+            color: #334155;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: color 0.2s;
+            background: none;
+            border: none;
+            padding: 0;
+        }
+        .eye-btn:hover { color: #64748b; }
+
+        /* ── REMEMBER ME ── */
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: -4px;
+        }
+
+        .remember-row input[type="checkbox"] {
+            width: 15px; height: 15px;
+            accent-color: #38bdf8;
+            cursor: pointer;
+        }
+
+        .remember-row label {
+            font-size: 0.82rem;
+            color: #475569;
+            cursor: pointer;
+        }
+
+        /* ── LOGIN BUTTON ── */
+        .login-btn {
+            width: 100%;
+            padding: 12px;
+            background: #38bdf8;
+            color: #0f172a;
+            border: none;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .login-btn:hover {
+            background: #0ea5e9;
+            box-shadow: 0 4px 20px rgba(56,189,248,0.3);
+            transform: translateY(-1px);
+        }
+
+        .login-btn:active { transform: translateY(0); }
+
+        /* ── ERROR MESSAGE ── */
+        .error-msg {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 14px;
+            background: rgba(248,113,113,0.08);
+            border: 1px solid rgba(248,113,113,0.2);
+            border-radius: 8px;
+            color: #f87171;
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+        }
+
+        .error-msg i { font-size: 0.85rem; flex-shrink: 0; }
+
+        /* ── FOOTER ── */
+        .login-footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 0.75rem;
+            color: #334155;
+        }
+
+        .login-footer span { color: #38bdf8; }
+    </style>
+</head>
+
+<body>
+
+    <!-- Background -->
+    <div class="bg-grid"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <!-- Login Card -->
+    <div class="login-card">
+
+        <!-- Logo -->
+        <div class="login-logo-wrap">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Smart ERP Logo">
+            <div class="login-brand">Smart ERP</div>
+            <div class="login-tagline">Management System</div>
+        </div>
+
+        <div class="login-divider"></div>
+
+        <!-- Error -->
+        {% if error %}
+        <div class="error-msg">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <!-- Form -->
+        <form method="POST" class="login-form">
+
+            <div class="field-wrap">
+                <label for="username">Username</label>
+                <div class="field-inner">
+                    <input type="text" id="username" name="username"
+                           placeholder="Enter your username" required autocomplete="username">
+                    <i class="fa-solid fa-user field-icon"></i>
+                </div>
+            </div>
+
+            <div class="field-wrap">
+                <label for="password">Password</label>
+                <div class="field-inner">
+                    <input type="password" id="password" name="password"
+                           placeholder="Enter your password" required autocomplete="current-password">
+                    <i class="fa-solid fa-lock field-icon"></i>
+                    <button type="button" class="eye-btn" onclick="togglePassword()">
+                        <i class="fa-solid fa-eye" id="eyeIcon"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="remember-row">
+                <input type="checkbox" id="remember" name="remember">
+                <label for="remember">Remember me</label>
+            </div>
+
+            <button type="submit" class="login-btn">
+                <i class="fa-solid fa-right-to-bracket"></i>
+                Sign In
+            </button>
+
+        </form>
+
+        <div class="login-footer">
+            &copy; 2026 <span>Smart ERP</span> — All rights reserved
+        </div>
+
+    </div>
+
+<script>
+function togglePassword() {
+    const input   = document.getElementById("password");
+    const icon    = document.getElementById("eyeIcon");
+    if (input.type === "password") {
+        input.type = "text";
+        icon.classList.replace("fa-eye", "fa-eye-slash");
+    } else {
+        input.type = "password";
+        icon.classList.replace("fa-eye-slash", "fa-eye");
+    }
+}
+</script>
+
+</body>
+</html>
