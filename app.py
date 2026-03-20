@@ -22,11 +22,13 @@ def allowed_file(filename):
 
 def get_db():
     return mysql.connector.connect(
-        host='localhost',
-        user='root',
-        password='root',
-        database='smart_erp'
+        host=os.environ.get('MYSQLHOST', 'localhost'),
+        user=os.environ.get('MYSQLUSER', 'root'),
+        password=os.environ.get('MYSQLPASSWORD', 'root'),
+        database=os.environ.get('MYSQLDATABASE', 'smart_erp'),
+        port=int(os.environ.get('MYSQLPORT', 3306))
     )
+    
 
 # ---------------- DECORATORS ----------------
 
