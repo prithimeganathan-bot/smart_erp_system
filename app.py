@@ -2,9 +2,21 @@ from flask import Flask, request, jsonify, render_template, redirect, url_for, s
 import mysql.connector
 from functools import wraps
 from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
+import os
 
 app = Flask(__name__)
 app.secret_key = "smarterp_secret_2026"
+
+# ---------------- UPLOAD CONFIG ----------------
+
+UPLOAD_FOLDER    = 'static/product_images'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # ---------------- DB CONNECTION ----------------
 
@@ -36,6 +48,14 @@ def admin_required(f):
         return f(*args, **kwargs)
     return decorated
 
+def customer_login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'customer_id' not in session:
+            return redirect(url_for('customer_login'))
+        return f(*args, **kwargs)
+    return decorated
+
 # ---------------- AUTH ----------------
 
 @app.route('/')
@@ -56,40 +76,110 @@ def login():
         db.close()
 
         if user and check_password_hash(user[2], password):
-            session['user_id'] = user[0]
+            session['user_id']  = user[0]
             session['username'] = user[1]
-            session['role'] = user[3]
+            session['role']     = user[3]
             return redirect(url_for('dashboard'))
 
-        return render_template("login.html", error="Invalid username or password")
+        return render_template("login.html", error="Invalid username or password", portal="admin")
 
-    return render_template("login.html")
+    portal = request.args.get('portal', 'admin')
+    return render_template("login.html", portal=portal)
 
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
 
+# ---------------- CUSTOMER AUTH ----------------
+
+@app.route('/customer_login', methods=['GET', 'POST'])
+def customer_login():
+    if request.method == 'POST':
+        email    = request.form['email']
+        password = request.form['password']
+
+        db     = get_db()
+        cursor = db.cursor()
+        cursor.execute("""
+            SELECT customer_id, customer_name, password
+            FROM customers WHERE email=%s
+        """, (email,))
+        customer = cursor.fetchone()
+        cursor.close()
+        db.close()
+
+        if customer and check_password_hash(customer[2], password):
+            session['customer_id']   = customer[0]
+            session['customer_name'] = customer[1]
+            return redirect(url_for('shop'))
+
+        return render_template("login.html", error="Invalid email or password", portal="customer")
+
+    return redirect(url_for('login') + '?portal=customer')
+
+@app.route('/customer_register', methods=['GET', 'POST'])
+def customer_register():
+    if request.method == 'POST':
+        name     = request.form['name']
+        email    = request.form['email']
+        phone    = request.form.get('phone', '')
+        password = request.form['password']
+        hashed   = generate_password_hash(password)
+
+        db     = get_db()
+        cursor = db.cursor()
+        try:
+            cursor.execute("""
+                INSERT INTO customers (customer_name, email, phone, password)
+                VALUES (%s, %s, %s, %s)
+            """, (name, email, phone, hashed))
+            db.commit()
+            cursor.close()
+            db.close()
+            return redirect(url_for('login') + '?portal=customer')
+        except mysql.connector.IntegrityError:
+            cursor.close()
+            db.close()
+            return render_template("login.html",
+                                   error="Email already registered. Please login.",
+                                   portal="customer")
+
+    return redirect(url_for('login') + '?portal=customer')
+
+@app.route('/customer_logout')
+def customer_logout():
+    session.pop('customer_id', None)
+    session.pop('customer_name', None)
+    return redirect(url_for('customer_login'))
+
 # ---------------- DASHBOARD ----------------
 
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    db = get_db()
+    db     = get_db()
     cursor = db.cursor()
 
     cursor.execute("SELECT COUNT(*) FROM products")
     total_products = cursor.fetchone()[0]
 
-    cursor.execute("SELECT product_name, stock_quantity FROM products WHERE stock_quantity <= reorder_level")
+    cursor.execute("""
+        SELECT product_name, stock_quantity FROM products
+        WHERE stock_quantity <= reorder_level
+    """)
     low_stock_products = cursor.fetchall()
 
-    cursor.execute("SELECT IFNULL(SUM(total_amount),0) FROM sales_invoices WHERE DATE(invoice_date)=CURDATE()")
+    cursor.execute("""
+        SELECT IFNULL(SUM(total_amount),0) FROM sales_invoices
+        WHERE DATE(invoice_date)=CURDATE()
+    """)
     today_sales = cursor.fetchone()[0]
 
     cursor.execute("""
         SELECT IFNULL(SUM(total_amount),0) FROM sales_invoices
-        WHERE MONTH(invoice_date)=MONTH(CURDATE()) AND YEAR(invoice_date)=YEAR(CURDATE())
+        WHERE MONTH(invoice_date)=MONTH(CURDATE())
+        AND YEAR(invoice_date)=YEAR(CURDATE())
     """)
     monthly_sales = cursor.fetchone()[0]
 
@@ -111,7 +201,7 @@ def dashboard():
 @app.route('/products_page')
 @login_required
 def products_page():
-    db = get_db()
+    db     = get_db()
     cursor = db.cursor()
     cursor.execute("SELECT category_id, category_name FROM categories ORDER BY category_name")
     categories = cursor.fetchall()
@@ -122,11 +212,12 @@ def products_page():
 @app.route('/products')
 @login_required
 def get_products():
-    db = get_db()
+    db     = get_db()
     cursor = db.cursor(dictionary=True)
     cursor.execute("""
-        SELECT p.product_id, p.product_name, c.category_name,
-               p.cost_price, p.selling_price, p.stock_quantity, p.reorder_level
+        SELECT p.product_id, p.product_name, c.category_name, c.category_id,
+               p.cost_price, p.selling_price, p.stock_quantity,
+               p.reorder_level, p.image_path
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.category_id
         ORDER BY p.product_id DESC
@@ -140,32 +231,73 @@ def get_products():
 @login_required
 @admin_required
 def add_product():
-    data = request.get_json()
-    db = get_db()
+    if request.is_json:
+        data          = request.get_json()
+        product_name  = data.get('product_name')
+        category_id   = data.get('category_id')
+        cost_price    = data.get('cost_price')
+        selling_price = data.get('selling_price')
+        stock_quantity= data.get('stock_quantity')
+        reorder_level = data.get('reorder_level', 5)
+        image_url     = data.get('image_url', None)
+    else:
+        product_name  = request.form.get('product_name')
+        category_id   = request.form.get('category_id')
+        cost_price    = request.form.get('cost_price')
+        selling_price = request.form.get('selling_price')
+        stock_quantity= request.form.get('stock_quantity')
+        reorder_level = request.form.get('reorder_level', 5)
+        image_url     = request.form.get('image_url', None)
+
+    db     = get_db()
     cursor = db.cursor()
     cursor.execute("""
-        INSERT INTO products (product_name, category_id, cost_price, selling_price, stock_quantity, reorder_level)
-        VALUES (%s, %s, %s, %s, %s, %s)
-    """, (data['product_name'], data['category_id'], data['cost_price'],
-          data['selling_price'], data['stock_quantity'], data.get('reorder_level', 5)))
+        INSERT INTO products
+        (product_name, category_id, cost_price, selling_price,
+         stock_quantity, reorder_level, image_path)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+    """, (product_name, category_id, cost_price,
+          selling_price, stock_quantity, reorder_level,
+          image_url if image_url else None))
     db.commit()
     cursor.close()
     db.close()
     return jsonify({"message": "Product added successfully"})
 
-@app.route('/update_product/<int:product_id>', methods=['PUT'])
+@app.route('/update_product/<int:product_id>', methods=['PUT', 'POST'])
 @login_required
 @admin_required
 def update_product(product_id):
-    data = request.get_json()
-    db = get_db()
+    # Handle both JSON and form data
+    if request.is_json:
+        data          = request.get_json()
+        product_name  = data.get('product_name')
+        category_id   = data.get('category_id')
+        cost_price    = data.get('cost_price')
+        selling_price = data.get('selling_price')
+        stock_quantity= data.get('stock_quantity')
+        reorder_level = data.get('reorder_level', 5)
+        image_url     = data.get('image_url', None)
+    else:
+        product_name  = request.form.get('product_name')
+        category_id   = request.form.get('category_id')
+        cost_price    = request.form.get('cost_price')
+        selling_price = request.form.get('selling_price')
+        stock_quantity= request.form.get('stock_quantity')
+        reorder_level = request.form.get('reorder_level', 5)
+        image_url     = request.form.get('image_url', None)
+
+    db     = get_db()
     cursor = db.cursor()
     cursor.execute("""
-        UPDATE products SET product_name=%s, category_id=%s, cost_price=%s,
-        selling_price=%s, stock_quantity=%s, reorder_level=%s
+        UPDATE products SET product_name=%s, category_id=%s,
+        cost_price=%s, selling_price=%s, stock_quantity=%s,
+        reorder_level=%s, image_path=%s
         WHERE product_id=%s
-    """, (data['product_name'], data['category_id'], data['cost_price'],
-          data['selling_price'], data['stock_quantity'], data.get('reorder_level', 5), product_id))
+    """, (product_name, category_id, cost_price, selling_price,
+          stock_quantity, reorder_level,
+          image_url if image_url else None,
+          product_id))
     db.commit()
     cursor.close()
     db.close()
@@ -175,20 +307,28 @@ def update_product(product_id):
 @login_required
 @admin_required
 def delete_product(product_id):
-    db = get_db()
+    db     = get_db()
     cursor = db.cursor()
-    cursor.execute("DELETE FROM products WHERE product_id=%s", (product_id,))
-    db.commit()
-    cursor.close()
-    db.close()
-    return jsonify({"message": "Product deleted successfully"})
-
+    try:
+        # Delete related records first
+        cursor.execute("DELETE FROM sales_items WHERE product_id=%s", (product_id,))
+        cursor.execute("DELETE FROM purchase_items WHERE product_id=%s", (product_id,))
+        # Now delete the product
+        cursor.execute("DELETE FROM products WHERE product_id=%s", (product_id,))
+        db.commit()
+        return jsonify({"message": "Product deleted successfully"})
+    except Exception as e:
+        db.rollback()
+        return jsonify({"message": f"Cannot delete: {str(e)}"}), 400
+    finally:
+        cursor.close()
+        db.close()
 # ---------------- CATEGORIES ----------------
 
 @app.route('/categories')
 @login_required
 def get_categories():
-    db = get_db()
+    db     = get_db()
     cursor = db.cursor(dictionary=True)
     cursor.execute("SELECT * FROM categories ORDER BY category_name")
     categories = cursor.fetchall()
@@ -201,7 +341,7 @@ def get_categories():
 @app.route('/suppliers')
 @login_required
 def get_suppliers():
-    db = get_db()
+    db     = get_db()
     cursor = db.cursor(dictionary=True)
     cursor.execute("SELECT * FROM suppliers ORDER BY supplier_name")
     suppliers = cursor.fetchall()
@@ -213,8 +353,8 @@ def get_suppliers():
 @login_required
 @admin_required
 def add_supplier():
-    data = request.get_json()
-    db = get_db()
+    data   = request.get_json()
+    db     = get_db()
     cursor = db.cursor()
     cursor.execute("""
         INSERT INTO suppliers (supplier_name, contact, email)
@@ -235,22 +375,22 @@ def purchase_page():
 @app.route('/create_purchase', methods=['POST'])
 @login_required
 def create_purchase():
-    data = request.get_json()
+    data        = request.get_json()
     supplier_id = data['supplier_id']
-    items = data['items']
+    items       = data['items']
 
-    db = get_db()
+    db     = get_db()
     cursor = db.cursor()
-    total_amount = 0
+    total  = 0
 
     cursor.execute("INSERT INTO purchase_bills (supplier_id, total_amount) VALUES (%s, 0)", (supplier_id,))
     bill_id = cursor.lastrowid
 
     for item in items:
         product_id = item['product_id']
-        quantity = int(item['quantity'])
-        price = float(item['price'])
-        total_amount += quantity * price
+        quantity   = int(item['quantity'])
+        price      = float(item['price'])
+        total     += quantity * price
 
         cursor.execute("""
             INSERT INTO purchase_items (bill_id, product_id, quantity, purchase_price)
@@ -258,10 +398,11 @@ def create_purchase():
         """, (bill_id, product_id, quantity, price))
 
         cursor.execute("""
-            UPDATE products SET stock_quantity = stock_quantity + %s WHERE product_id=%s
+            UPDATE products SET stock_quantity = stock_quantity + %s
+            WHERE product_id=%s
         """, (quantity, product_id))
 
-    cursor.execute("UPDATE purchase_bills SET total_amount=%s WHERE bill_id=%s", (total_amount, bill_id))
+    cursor.execute("UPDATE purchase_bills SET total_amount=%s WHERE bill_id=%s", (total, bill_id))
     db.commit()
     cursor.close()
     db.close()
@@ -270,14 +411,13 @@ def create_purchase():
 @app.route('/get_purchases')
 @login_required
 def get_purchases():
-    db = get_db()
+    db     = get_db()
     cursor = db.cursor(dictionary=True)
     cursor.execute("""
         SELECT pb.bill_id, s.supplier_name, pb.total_amount, pb.bill_date
         FROM purchase_bills pb
         JOIN suppliers s ON pb.supplier_id = s.supplier_id
-        ORDER BY pb.bill_date DESC
-        LIMIT 50
+        ORDER BY pb.bill_date DESC LIMIT 50
     """)
     purchases = cursor.fetchall()
     for p in purchases:
@@ -296,13 +436,13 @@ def sales_page():
 @app.route('/create_sale', methods=['POST'])
 @login_required
 def create_sale():
-    data = request.get_json()
+    data          = request.get_json()
     customer_name = data.get('customer_name', 'Walk-in Customer')
-    items = data['items']
+    items         = data['items']
 
-    db = get_db()
+    db     = get_db()
     cursor = db.cursor()
-    total_amount = 0
+    total  = 0
 
     cursor.execute("INSERT INTO sales_invoices (customer_name, total_amount) VALUES (%s, 0)", (customer_name,))
     invoice_id = cursor.lastrowid
@@ -310,9 +450,12 @@ def create_sale():
     try:
         for item in items:
             product_id = item['product_id']
-            quantity = int(item['quantity'])
+            quantity   = int(item['quantity'])
 
-            cursor.execute("SELECT selling_price, cost_price, stock_quantity FROM products WHERE product_id=%s", (product_id,))
+            cursor.execute("""
+                SELECT selling_price, cost_price, stock_quantity
+                FROM products WHERE product_id=%s
+            """, (product_id,))
             row = cursor.fetchone()
             selling_price, cost_price, stock = row
 
@@ -321,16 +464,20 @@ def create_sale():
                 return jsonify({"message": f"Not enough stock. Available: {stock}"}), 400
 
             profit = (selling_price - cost_price) * quantity
-            total_amount += selling_price * quantity
+            total += selling_price * quantity
 
             cursor.execute("""
-                INSERT INTO sales_items (invoice_id, product_id, quantity, selling_price, profit)
+                INSERT INTO sales_items
+                (invoice_id, product_id, quantity, selling_price, profit)
                 VALUES (%s, %s, %s, %s, %s)
             """, (invoice_id, product_id, quantity, selling_price, profit))
 
-            cursor.execute("UPDATE products SET stock_quantity = stock_quantity - %s WHERE product_id=%s", (quantity, product_id))
+            cursor.execute("""
+                UPDATE products SET stock_quantity = stock_quantity - %s
+                WHERE product_id=%s
+            """, (quantity, product_id))
 
-        cursor.execute("UPDATE sales_invoices SET total_amount=%s WHERE invoice_id=%s", (total_amount, invoice_id))
+        cursor.execute("UPDATE sales_invoices SET total_amount=%s WHERE invoice_id=%s", (total, invoice_id))
         db.commit()
 
     except Exception as e:
@@ -340,18 +487,20 @@ def create_sale():
         cursor.close()
         db.close()
 
-    return jsonify({"message": "Sale recorded successfully", "invoice_id": invoice_id, "total": float(total_amount)})
+    return jsonify({
+        "message":    "Sale recorded successfully",
+        "invoice_id": invoice_id,
+        "total":      float(total)
+    })
 
 @app.route('/get_sales')
 @login_required
 def get_sales():
-    db = get_db()
+    db     = get_db()
     cursor = db.cursor(dictionary=True)
     cursor.execute("""
-        SELECT si.invoice_id, si.customer_name, si.total_amount, si.invoice_date
-        FROM sales_invoices si
-        ORDER BY si.invoice_date DESC
-        LIMIT 50
+        SELECT invoice_id, customer_name, total_amount, invoice_date
+        FROM sales_invoices ORDER BY invoice_date DESC LIMIT 50
     """)
     sales = cursor.fetchall()
     for s in sales:
@@ -360,12 +509,134 @@ def get_sales():
     db.close()
     return jsonify(sales)
 
+# ---------------- SHOP ----------------
+
+@app.route('/shop')
+@customer_login_required
+def shop():
+    db     = get_db()
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT p.product_id, p.product_name, c.category_name,
+               p.selling_price, p.stock_quantity, p.image_path
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.category_id
+        WHERE p.stock_quantity > 0
+        ORDER BY c.category_name, p.product_name
+    """)
+    products = cursor.fetchall()
+    cursor.close()
+    db.close()
+    return render_template("shop.html",
+                           products=products,
+                           customer_name=session['customer_name'])
+
+@app.route('/place_order', methods=['POST'])
+@customer_login_required
+def place_order():
+    customer_name = session['customer_name']
+    data          = request.get_json()
+    items         = data.get('items', [])
+
+    if not items:
+        return jsonify({"error": "No items in order"}), 400
+
+    db     = get_db()
+    cursor = db.cursor()
+    total  = 0
+
+    cursor.execute("""
+        INSERT INTO sales_invoices (customer_name, total_amount)
+        VALUES (%s, 0)
+    """, (customer_name,))
+    invoice_id = cursor.lastrowid
+
+    try:
+        for item in items:
+            product_id = item['product_id']
+            quantity   = int(item['quantity'])
+
+            cursor.execute("""
+                SELECT selling_price, cost_price, stock_quantity, product_name
+                FROM products WHERE product_id=%s
+            """, (product_id,))
+            row = cursor.fetchone()
+            selling_price, cost_price, stock, product_name = row
+
+            if quantity > stock:
+                db.rollback()
+                return jsonify({"error": f"Not enough stock for {product_name}. Available: {stock}"}), 400
+
+            profit = (selling_price - cost_price) * quantity
+            total += selling_price * quantity
+
+            cursor.execute("""
+                INSERT INTO sales_items
+                (invoice_id, product_id, quantity, selling_price, profit)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (invoice_id, product_id, quantity, selling_price, profit))
+
+            cursor.execute("""
+                UPDATE products SET stock_quantity = stock_quantity - %s
+                WHERE product_id = %s
+            """, (quantity, product_id))
+
+        cursor.execute("""
+            UPDATE sales_invoices SET total_amount=%s WHERE invoice_id=%s
+        """, (total, invoice_id))
+        db.commit()
+
+    except Exception as e:
+        db.rollback()
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        db.close()
+
+    return jsonify({
+        "message":    "Order placed successfully",
+        "invoice_id": invoice_id,
+        "total":      float(total),
+        "customer":   customer_name
+    })
+
+@app.route('/get_invoice/<int:invoice_id>')
+def get_invoice(invoice_id):
+    db     = get_db()
+    cursor = db.cursor(dictionary=True)
+
+    cursor.execute("""
+        SELECT customer_name, total_amount, invoice_date
+        FROM sales_invoices WHERE invoice_id=%s
+    """, (invoice_id,))
+    invoice = cursor.fetchone()
+
+    cursor.execute("""
+        SELECT p.product_name, si.quantity, si.selling_price,
+               (si.quantity * si.selling_price) as subtotal
+        FROM sales_items si
+        JOIN products p ON si.product_id = p.product_id
+        WHERE si.invoice_id = %s
+    """, (invoice_id,))
+    items = cursor.fetchall()
+    cursor.close()
+    db.close()
+
+    if invoice:
+        invoice['invoice_date'] = str(invoice['invoice_date'])
+        invoice['total_amount'] = float(invoice['total_amount'])
+    for item in items:
+        item['selling_price'] = float(item['selling_price'])
+        item['subtotal']      = float(item['subtotal'])
+
+    return jsonify({"invoice": invoice, "items": items})
+
 # ---------------- ANALYTICS ----------------
 
 @app.route('/monthly_sales_data')
 @login_required
 def monthly_sales_data():
-    db = get_db()
+    db     = get_db()
     cursor = db.cursor()
     cursor.execute("""
         SELECT MONTH(invoice_date), IFNULL(SUM(total_amount),0)
@@ -382,7 +653,7 @@ def monthly_sales_data():
 @app.route('/top_products')
 @login_required
 def top_products():
-    db = get_db()
+    db     = get_db()
     cursor = db.cursor()
     cursor.execute("""
         SELECT c.category_name, p.product_name, SUM(si.quantity) as total_sold
@@ -397,31 +668,88 @@ def top_products():
     db.close()
     return jsonify(data)
 
-# ---------------- USER MANAGEMENT (Admin only) ----------------
+@app.route('/sales_vs_purchase')
+@login_required
+def sales_vs_purchase():
+    db     = get_db()
+    cursor = db.cursor()
+
+    cursor.execute("""
+        SELECT MONTH(invoice_date), IFNULL(SUM(total_amount),0)
+        FROM sales_invoices WHERE YEAR(invoice_date)=YEAR(CURDATE())
+        GROUP BY MONTH(invoice_date)
+    """)
+    sales_data = {row[0]: float(row[1]) for row in cursor.fetchall()}
+
+    cursor.execute("""
+        SELECT MONTH(bill_date), IFNULL(SUM(total_amount),0)
+        FROM purchase_bills WHERE YEAR(bill_date)=YEAR(CURDATE())
+        GROUP BY MONTH(bill_date)
+    """)
+    purchase_data = {row[0]: float(row[1]) for row in cursor.fetchall()}
+
+    result = []
+    for m in range(1, 13):
+        result.append({
+            "month":    m,
+            "sales":    sales_data.get(m, 0),
+            "purchase": purchase_data.get(m, 0)
+        })
+
+    cursor.close()
+    db.close()
+    return jsonify(result)
+
+@app.route('/category_sales')
+@login_required
+def category_sales():
+    db     = get_db()
+    cursor = db.cursor()
+    cursor.execute("""
+        SELECT c.category_name,
+               IFNULL(SUM(si.quantity * si.selling_price), 0) as total
+        FROM sales_items si
+        JOIN products p ON si.product_id = p.product_id
+        JOIN categories c ON p.category_id = c.category_id
+        GROUP BY c.category_name ORDER BY total DESC
+    """)
+    data = [{"category": row[0], "total": float(row[1])} for row in cursor.fetchall()]
+    cursor.close()
+    db.close()
+    return jsonify(data)
+
+# ---------------- USER MANAGEMENT ----------------
 
 @app.route('/users_page')
 @login_required
 def users_page():
     if session.get('role') != 'admin':
         return redirect(url_for('dashboard'))
-    db = get_db()
+    return render_template("users.html")
+
+@app.route('/get_users')
+@login_required
+def get_users():
+    db     = get_db()
     cursor = db.cursor(dictionary=True)
     cursor.execute("SELECT id, username, role FROM users ORDER BY id")
     users = cursor.fetchall()
     cursor.close()
     db.close()
-    return render_template("users.html", users=users)
+    return jsonify(users)
 
 @app.route('/add_user', methods=['POST'])
 @admin_required
 def add_user():
-    data = request.get_json()
+    data   = request.get_json()
     hashed = generate_password_hash(data['password'])
-    db = get_db()
+    db     = get_db()
     cursor = db.cursor()
     try:
-        cursor.execute("INSERT INTO users (username, password, role) VALUES (%s,%s,%s)",
-                       (data['username'], hashed, data.get('role', 'staff')))
+        cursor.execute("""
+            INSERT INTO users (username, password, role)
+            VALUES (%s, %s, %s)
+        """, (data['username'], hashed, data.get('role', 'staff')))
         db.commit()
         return jsonify({"message": "User created successfully"})
     except mysql.connector.IntegrityError:
@@ -435,7 +763,7 @@ def add_user():
 def delete_user(user_id):
     if user_id == session['user_id']:
         return jsonify({"message": "Cannot delete yourself"}), 400
-    db = get_db()
+    db     = get_db()
     cursor = db.cursor()
     cursor.execute("DELETE FROM users WHERE id=%s", (user_id,))
     db.commit()
@@ -443,78 +771,12 @@ def delete_user(user_id):
     db.close()
     return jsonify({"message": "User deleted successfully"})
 
-@app.route('/get_users')
-@login_required
-def get_users():
-    db = get_db()
-    cursor = db.cursor(dictionary=True)
-    cursor.execute("SELECT id, username, role FROM users ORDER BY id")
-    users = cursor.fetchall()
-    cursor.close()
-    db.close()
-    return jsonify(users)
-
 @app.route('/get_session_role')
 def get_session_role():
     return jsonify({
-        "role": session.get('role', 'staff'),
+        "role":    session.get('role', 'staff'),
         "user_id": session.get('user_id')
     })
-
-@app.route('/sales_vs_purchase')
-@login_required
-def sales_vs_purchase():
-    db = get_db()
-    cursor = db.cursor()
-
-    # Monthly sales for current year
-    cursor.execute("""
-        SELECT MONTH(invoice_date), IFNULL(SUM(total_amount),0)
-        FROM sales_invoices
-        WHERE YEAR(invoice_date)=YEAR(CURDATE())
-        GROUP BY MONTH(invoice_date)
-    """)
-    sales_data = {row[0]: float(row[1]) for row in cursor.fetchall()}
-
-    # Monthly purchases for current year
-    cursor.execute("""
-        SELECT MONTH(bill_date), IFNULL(SUM(total_amount),0)
-        FROM purchase_bills
-        WHERE YEAR(bill_date)=YEAR(CURDATE())
-        GROUP BY MONTH(bill_date)
-    """)
-    purchase_data = {row[0]: float(row[1]) for row in cursor.fetchall()}
-
-    result = []
-    for m in range(1, 13):
-        result.append({
-            "month": m,
-            "sales": sales_data.get(m, 0),
-            "purchase": purchase_data.get(m, 0)
-        })
-
-    cursor.close()
-    db.close()
-    return jsonify(result)
-
-
-@app.route('/category_sales')
-@login_required
-def category_sales():
-    db = get_db()
-    cursor = db.cursor()
-    cursor.execute("""
-        SELECT c.category_name, IFNULL(SUM(si.quantity * si.selling_price), 0) as total
-        FROM sales_items si
-        JOIN products p ON si.product_id = p.product_id
-        JOIN categories c ON p.category_id = c.category_id
-        GROUP BY c.category_name
-        ORDER BY total DESC
-    """)
-    data = [{"category": row[0], "total": float(row[1])} for row in cursor.fetchall()]
-    cursor.close()
-    db.close()
-    return jsonify(data)
 
 if __name__ == '__main__':
     app.run(debug=True)

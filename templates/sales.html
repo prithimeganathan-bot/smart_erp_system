@@ -4,61 +4,61 @@
 
 <div class="page-header">
     <h1><i class="fa-solid fa-receipt page-icon"></i> Sales</h1>
-    <p class="page-sub">Record sales invoices and track your sales history</p>
+    <p class="page-sub">View all sales orders placed by customers</p>
 </div>
 
-<div class="card form-card">
-    <h2><i class="fa-solid fa-file-invoice-dollar"></i> New Sale Invoice</h2>
-    <div class="form-row">
-        <div class="input-wrap">
-            <label>Customer Name</label>
-            <input type="text" id="customer_name" placeholder="e.g. Raj Kumar  (leave blank for Walk-in Customer)">
+<!-- STATS ROW -->
+<div class="cards" style="margin-bottom:20px;">
+    <div class="card kpi-card" style="margin-bottom:0;">
+        <div class="kpi-icon" style="background:rgba(56,189,248,0.12);color:#38bdf8;">
+            <i class="fa-solid fa-receipt"></i>
+        </div>
+        <div>
+            <p class="kpi-label">Total Orders</p>
+            <p class="kpi-value" id="totalOrders">—</p>
         </div>
     </div>
-    <div class="items-header">
-        <span class="items-title"><i class="fa-solid fa-cart-shopping"></i> Items</span>
-        <button class="btn-add-item" onclick="addItemRow()">
-            <i class="fa-solid fa-plus"></i> Add Item
-        </button>
+    <div class="card kpi-card" style="margin-bottom:0;">
+        <div class="kpi-icon" style="background:rgba(34,197,94,0.12);color:#4ade80;">
+            <i class="fa-solid fa-indian-rupee-sign"></i>
+        </div>
+        <div>
+            <p class="kpi-label">Total Revenue</p>
+            <p class="kpi-value" id="totalRevenue">—</p>
+        </div>
     </div>
-    <div class="table-wrap">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Product</th>
-                    <th>Available Stock</th>
-                    <th>Selling Price</th>
-                    <th>Quantity</th>
-                    <th>Subtotal</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody id="itemsBody"></tbody>
-        </table>
+    <div class="card kpi-card" style="margin-bottom:0;">
+        <div class="kpi-icon" style="background:rgba(167,139,250,0.12);color:#a78bfa;">
+            <i class="fa-solid fa-users"></i>
+        </div>
+        <div>
+            <p class="kpi-label">Unique Customers</p>
+            <p class="kpi-value" id="uniqueCustomers">—</p>
+        </div>
     </div>
-    <div class="total-bar">
-        <span class="total-label">Total Amount</span>
-        <span id="totalAmount" class="total-value">Rs. 0.00</span>
+    <div class="card kpi-card" style="margin-bottom:0;">
+        <div class="kpi-icon" style="background:rgba(251,146,60,0.12);color:#fb923c;">
+            <i class="fa-solid fa-calendar-day"></i>
+        </div>
+        <div>
+            <p class="kpi-label">Today's Orders</p>
+            <p class="kpi-value" id="todayOrders">—</p>
+        </div>
     </div>
-    <div class="form-actions" style="margin-top:16px;">
-        <button class="btn-primary" id="recordBtn" onclick="submitSale()">
-            <i class="fa-solid fa-check"></i> Record Sale
-        </button>
-        <button class="btn-secondary" onclick="resetSaleForm()">
-            <i class="fa-solid fa-xmark"></i> Clear
-        </button>
-    </div>
-    <div id="saleMessage" class="form-message"></div>
 </div>
 
+<!-- SALES HISTORY -->
 <div class="card">
     <div class="history-header">
         <h2><i class="fa-solid fa-clock-rotate-left"></i> Sales History</h2>
         <div class="search-wrap">
             <i class="fa-solid fa-magnifying-glass search-icon"></i>
-            <input type="text" id="saleSearch" placeholder="Search by customer..." oninput="filterSales()">
+            <input type="text" id="saleSearch"
+                   placeholder="Search by customer..."
+                   oninput="filterSales()">
         </div>
     </div>
+
     <div class="table-wrap">
         <table class="data-table">
             <thead>
@@ -77,139 +77,63 @@
     </div>
 </div>
 
+<style>
+.kpi-card { display:flex; align-items:center; gap:16px; padding:20px 22px; }
+.kpi-icon  { width:46px; height:46px; border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; flex-shrink:0; }
+.kpi-label { font-size:0.72rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.7px; font-weight:600; margin-bottom:5px; }
+.kpi-value { font-size:1.35rem; font-weight:700; color:var(--text-primary); }
+</style>
+
 <script>
-let allProducts = [];
-let allSales    = [];
-let rowCount    = 0;
+let allSales = [];
 
-fetch('/products')
-.then(res => res.json())
-.then(data => {
-    allProducts = data;
-    if (document.querySelectorAll("#itemsBody tr").length === 0) addItemRow();
-});
 loadSales();
-
-function addItemRow() {
-    if (allProducts.length === 0) { showSaleMessage("No products available.", "error"); return; }
-    rowCount++;
-    const rowId = `row_${rowCount}`;
-    let options = `<option value="">-- Select Product --</option>`;
-    allProducts.forEach(p => {
-        options += `<option value="${p.product_id}" data-price="${p.selling_price}" data-stock="${p.stock_quantity}">
-            ${p.product_name} (Rs.${parseFloat(p.selling_price).toFixed(2)})
-        </option>`;
-    });
-    const tr = document.createElement('tr');
-    tr.id = rowId;
-    tr.innerHTML = `
-        <td><select onchange="onProductChange('${rowId}')">${options}</select></td>
-        <td id="${rowId}_stock" style="color:var(--text-muted);">—</td>
-        <td id="${rowId}_price" style="color:var(--accent);">—</td>
-        <td><input type="number" id="${rowId}_qty" min="1" value="1" oninput="updateSubtotal('${rowId}')" style="width:80px;"></td>
-        <td id="${rowId}_subtotal" class="subtotal-cell">Rs. 0.00</td>
-        <td><button class="remove-btn" onclick="removeRow('${rowId}')"><i class="fa-solid fa-xmark"></i></button></td>`;
-    document.getElementById("itemsBody").appendChild(tr);
-}
-
-function onProductChange(rowId) {
-    const row    = document.getElementById(rowId);
-    const select = row.querySelector("select");
-    const option = select.options[select.selectedIndex];
-    const price  = parseFloat(option.dataset.price) || 0;
-    const stock  = parseInt(option.dataset.stock)   || 0;
-    document.getElementById(`${rowId}_price`).textContent = price > 0 ? `Rs. ${price.toFixed(2)}` : '—';
-    const stockEl = document.getElementById(`${rowId}_stock`);
-    stockEl.textContent = stock;
-    stockEl.className   = stock === 0 ? 'stock-low' : stock <= 5 ? 'stock-warn' : 'stock-ok';
-    document.getElementById(`${rowId}_qty`).max = stock;
-    updateSubtotal(rowId);
-}
-
-function updateSubtotal(rowId) {
-    const row    = document.getElementById(rowId);
-    const select = row.querySelector("select");
-    const option = select.options[select.selectedIndex];
-    const price  = parseFloat(option.dataset.price) || 0;
-    const qty    = parseInt(document.getElementById(`${rowId}_qty`).value) || 0;
-    document.getElementById(`${rowId}_subtotal`).textContent = `Rs. ${(price * qty).toFixed(2)}`;
-    updateTotal();
-}
-
-function updateTotal() {
-    let total = 0;
-    document.querySelectorAll("#itemsBody tr").forEach(row => {
-        const el = row.querySelector("td.subtotal-cell");
-        if (el) total += parseFloat(el.textContent.replace('Rs.','').trim()) || 0;
-    });
-    document.getElementById("totalAmount").textContent = `Rs. ${total.toFixed(2)}`;
-}
-
-function removeRow(rowId) {
-    if (document.querySelectorAll("#itemsBody tr").length <= 1) { showSaleMessage("At least one item is required.", "error"); return; }
-    document.getElementById(rowId)?.remove();
-    updateTotal();
-}
-
-function submitSale() {
-    const customer_name = document.getElementById("customer_name").value.trim() || "Walk-in Customer";
-    const rows = document.querySelectorAll("#itemsBody tr");
-    let items = [], valid = true;
-    rows.forEach(row => {
-        const select = row.querySelector("select");
-        const qtyEl  = row.querySelector("input[type='number']");
-        if (!select || !qtyEl) return;
-        const product_id = select.value;
-        const quantity   = parseInt(qtyEl.value);
-        const stock      = parseInt(select.options[select.selectedIndex].dataset.stock) || 0;
-        if (!product_id) { showSaleMessage("Please select a product for all rows.", "error"); valid = false; return; }
-        if (!quantity || quantity <= 0) { showSaleMessage("Please enter a valid quantity.", "error"); valid = false; return; }
-        if (quantity > stock) { showSaleMessage(`Not enough stock. Available: ${stock}`, "error"); valid = false; return; }
-        items.push({ product_id, quantity });
-    });
-    if (!valid || items.length === 0) return;
-    const btn = document.getElementById("recordBtn");
-    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Recording...';
-    fetch('/create_sale', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ customer_name, items }) })
-    .then(res => res.json())
-    .then(result => {
-        if (result.error || result.message === "Not enough stock") {
-            showSaleMessage(result.message || result.error, "error");
-            btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Record Sale'; return;
-        }
-        showSaleMessage(`Sale recorded. Invoice #${result.invoice_id} — Total: Rs. ${parseFloat(result.total).toFixed(2)}`, "success");
-        resetSaleForm(); loadSales();
-    })
-    .catch(() => { showSaleMessage("Something went wrong.", "error"); btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Record Sale'; });
-}
-
-function resetSaleForm() {
-    document.getElementById("customer_name").value = '';
-    document.getElementById("itemsBody").innerHTML = '';
-    document.getElementById("totalAmount").textContent = 'Rs. 0.00';
-    rowCount = 0;
-    const btn = document.getElementById("recordBtn");
-    btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Record Sale';
-    addItemRow();
-}
 
 function loadSales() {
     fetch('/get_sales')
     .then(res => res.json())
-    .then(data => { allSales = data; renderSales(data); })
-    .catch(() => { document.getElementById("salesBody").innerHTML = `<tr><td colspan="5" class="loading-row">Failed to load sales.</td></tr>`; });
+    .then(data => {
+        allSales = data;
+        renderSales(data);
+        updateStats(data);
+    })
+    .catch(() => {
+        document.getElementById("salesBody").innerHTML =
+            `<tr><td colspan="5" class="loading-row">Failed to load sales.</td></tr>`;
+    });
+}
+
+function updateStats(data) {
+    // Total orders
+    document.getElementById("totalOrders").textContent = data.length;
+
+    // Total revenue
+    const revenue = data.reduce((s, d) => s + parseFloat(d.total_amount), 0);
+    document.getElementById("totalRevenue").textContent = `Rs. ${revenue.toFixed(2)}`;
+
+    // Unique customers
+    const unique = new Set(data.map(d => d.customer_name)).size;
+    document.getElementById("uniqueCustomers").textContent = unique;
+
+    // Today's orders
+    const today = new Date().toISOString().split('T')[0];
+    const todayCount = data.filter(d => d.invoice_date.startsWith(today)).length;
+    document.getElementById("todayOrders").textContent = todayCount;
 }
 
 function renderSales(data) {
     const body = document.getElementById("salesBody");
-    if (data.length === 0) { body.innerHTML = `<tr><td colspan="5" class="loading-row">No sales recorded yet.</td></tr>`; return; }
+    if (data.length === 0) {
+        body.innerHTML = `<tr><td colspan="5" class="loading-row">No sales recorded yet.</td></tr>`;
+        return;
+    }
     body.innerHTML = "";
     data.forEach((s, i) => {
         body.innerHTML += `
             <tr>
                 <td style="color:var(--text-muted);">${i + 1}</td>
                 <td><span class="invoice-badge">INV-${String(s.invoice_id).padStart(4,'0')}</span></td>
-                <td style="color:var(--text-primary);">${s.customer_name || 'Walk-in Customer'}</td>
+                <td style="color:var(--text-primary);font-weight:500;">${s.customer_name || 'Walk-in Customer'}</td>
                 <td class="amount-cell">Rs. ${parseFloat(s.total_amount).toFixed(2)}</td>
                 <td class="date-cell">${s.invoice_date}</td>
             </tr>`;
@@ -219,16 +143,13 @@ function renderSales(data) {
 function filterSales() {
     const query = document.getElementById("saleSearch").value.toLowerCase().trim();
     if (query === '') { renderSales(allSales); return; }
-    const filtered = allSales.filter(s => (s.customer_name || '').toLowerCase().includes(query));
+    const filtered = allSales.filter(s =>
+        (s.customer_name || '').toLowerCase().includes(query)
+    );
     if (filtered.length === 0) {
-        document.getElementById("salesBody").innerHTML = `<tr><td colspan="5" class="loading-row">No sales found for "${query}"</td></tr>`;
+        document.getElementById("salesBody").innerHTML =
+            `<tr><td colspan="5" class="loading-row">No sales found for "${query}"</td></tr>`;
     } else { renderSales(filtered); }
-}
-
-function showSaleMessage(msg, type) {
-    const el = document.getElementById("saleMessage");
-    el.textContent = msg; el.className = "form-message " + type;
-    setTimeout(() => { el.className = "form-message"; el.textContent = ''; }, 5000);
 }
 </script>
 

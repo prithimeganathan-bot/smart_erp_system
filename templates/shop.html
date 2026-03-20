@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart ERP | Shop</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+        :root {
+            --accent:   #38bdf8;
+            --accent-d: #0ea5e9;
+            --success:  #4ade80;
+            --danger:   #f87171;
+            --bg:       #0f172a;
+            --card:     #1a2436;
+            --border:   #1e293b;
+            --input:    #0f172a;
+            --t1:       #f1f5f9;
+            --t2:       #94a3b8;
+            --t3:       #475569;
+        }
+
+        body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--t2); min-height:100vh; }
+
+        /* ── HEADER ── */
+        .shop-header {
+            background:#0d1526; border-bottom:1px solid var(--border);
+            padding:14px 32px; display:flex; align-items:center;
+            justify-content:space-between; position:sticky; top:0; z-index:100;
+        }
+
+        .brand { display:flex; align-items:center; gap:12px; }
+        .brand img { width:32px; height:32px; object-fit:contain; }
+        .brand-name { font-size:1rem; font-weight:700; color:var(--t1); display:block; }
+        .brand-sub  { font-size:0.65rem; color:var(--accent); text-transform:uppercase; letter-spacing:1px; display:block; }
+
+        .header-right { display:flex; align-items:center; gap:12px; }
+
+        .welcome-chip {
+            display:flex; align-items:center; gap:8px;
+            padding:7px 14px;
+            background:rgba(56,189,248,0.08);
+            border:1px solid rgba(56,189,248,0.2);
+            border-radius:20px; font-size:0.82rem; color:var(--accent);
+        }
+
+        .welcome-chip .avatar {
+            width:24px; height:24px; border-radius:50%;
+            background:var(--accent); color:#0f172a;
+            font-size:0.72rem; font-weight:700;
+            display:flex; align-items:center; justify-content:center;
+        }
+
+        .cart-btn {
+            display:flex; align-items:center; gap:8px;
+            padding:9px 18px; background:var(--accent); color:#0f172a;
+            border:none; border-radius:10px; font-weight:700;
+            font-size:0.88rem; cursor:pointer; transition:all 0.2s;
+        }
+        .cart-btn:hover { background:var(--accent-d); transform:translateY(-1px); }
+
+        .cart-count {
+            background:#0f172a; color:var(--accent);
+            width:20px; height:20px; border-radius:50%;
+            font-size:0.72rem; font-weight:700;
+            display:flex; align-items:center; justify-content:center;
+        }
+
+        .logout-link {
+            display:flex; align-items:center; gap:6px;
+            padding:8px 14px; background:rgba(248,113,113,0.08);
+            color:var(--danger); border:1px solid rgba(248,113,113,0.2);
+            border-radius:8px; font-size:0.82rem; font-weight:600;
+            text-decoration:none; transition:all 0.2s;
+        }
+        .logout-link:hover { background:rgba(248,113,113,0.15); }
+
+        /* ── MAIN ── */
+        .shop-main { max-width:1280px; margin:0 auto; padding:28px 24px; }
+
+        /* ── TOOLBAR ── */
+        .shop-toolbar {
+            display:flex; align-items:center; gap:12px;
+            margin-bottom:20px; flex-wrap:wrap;
+        }
+
+        .shop-search { position:relative; flex:1; min-width:200px; }
+        .shop-search i { position:absolute; left:13px; top:50%; transform:translateY(-50%); color:var(--t3); font-size:0.85rem; }
+        .shop-search input {
+            width:100%; padding:10px 14px 10px 38px;
+            background:var(--card); border:1px solid var(--border);
+            border-radius:10px; color:var(--t1); font-size:0.9rem; outline:none; transition:border 0.2s;
+        }
+        .shop-search input:focus { border-color:var(--accent); }
+        .shop-search input::placeholder { color:var(--t3); }
+
+        .filter-btns { display:flex; gap:8px; flex-wrap:wrap; }
+        .filter-btn {
+            padding:8px 16px; background:var(--card); border:1px solid var(--border);
+            border-radius:8px; color:var(--t3); font-size:0.8rem; font-weight:600;
+            cursor:pointer; transition:all 0.2s; white-space:nowrap;
+        }
+        .filter-btn:hover, .filter-btn.active {
+            background:rgba(56,189,248,0.1); border-color:var(--accent); color:var(--accent);
+        }
+
+        /* ── PRODUCT GRID ── */
+        .products-grid {
+            display:grid;
+            grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));
+            gap:16px; margin-bottom:32px;
+        }
+
+        .product-card {
+            background:var(--card); border:1px solid var(--border);
+            border-radius:14px; overflow:hidden;
+            transition:all 0.2s; display:flex; flex-direction:column;
+        }
+        .product-card:hover {
+            border-color:rgba(56,189,248,0.3);
+            transform:translateY(-3px);
+            box-shadow:0 10px 30px rgba(0,0,0,0.25);
+        }
+
+        /* Product image */
+        .product-img-wrap {
+            width:100%; height:160px;
+            background:#0f172a;
+            display:flex; align-items:center; justify-content:center;
+            overflow:hidden; position:relative;
+        }
+
+        .product-img-wrap img {
+            width:100%; height:100%; object-fit:cover;
+            transition:transform 0.3s ease;
+        }
+        .product-card:hover .product-img-wrap img { transform:scale(1.05); }
+
+        .product-img-placeholder {
+            display:flex; flex-direction:column; align-items:center; gap:8px;
+            color:#334155;
+        }
+        .product-img-placeholder i { font-size:2.5rem; }
+        .product-img-placeholder span { font-size:0.72rem; }
+
+        /* Product info */
+        .product-info { padding:14px; flex:1; display:flex; flex-direction:column; gap:8px; }
+
+        .product-cat {
+            font-size:0.68rem; color:var(--accent);
+            text-transform:uppercase; letter-spacing:0.8px; font-weight:700;
+        }
+
+        .product-name {
+            font-size:0.88rem; font-weight:700; color:var(--t1);
+            line-height:1.3;
+            display:-webkit-box; -webkit-line-clamp:2;
+            -webkit-box-orient:vertical; overflow:hidden;
+        }
+
+        .product-price { font-size:1.1rem; font-weight:700; color:var(--success); }
+
+        .product-stock { font-size:0.75rem; color:var(--t3); }
+        .product-stock.low { color:var(--danger); }
+
+        /* Qty controls */
+        .qty-row { display:flex; align-items:center; gap:6px; margin-top:4px; }
+
+        .qty-btn {
+            width:28px; height:28px;
+            background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.2);
+            border-radius:6px; color:var(--accent); font-size:1rem;
+            cursor:pointer; display:flex; align-items:center; justify-content:center;
+            transition:all 0.2s;
+        }
+        .qty-btn:hover { background:rgba(56,189,248,0.2); }
+
+        .qty-input {
+            width:44px; text-align:center; padding:5px;
+            background:var(--input); border:1px solid #2d3f55;
+            border-radius:6px; color:var(--t1); font-size:0.88rem; outline:none;
+        }
+
+        .add-cart-btn {
+            width:100%; padding:10px;
+            background:var(--accent); color:#0f172a;
+            border:none; border-radius:0 0 14px 14px;
+            font-weight:700; font-size:0.85rem;
+            cursor:pointer; transition:all 0.2s;
+            display:flex; align-items:center; justify-content:center; gap:7px;
+        }
+        .add-cart-btn:hover { background:var(--accent-d); }
+        .add-cart-btn.added { background:rgba(74,222,128,0.15); color:var(--success); }
+        .out-btn {
+            width:100%; padding:10px;
+            background:rgba(248,113,113,0.1); color:var(--danger);
+            border:none; border-radius:0 0 14px 14px;
+            font-size:0.85rem; cursor:not-allowed; font-weight:600;
+        }
+
+        /* ── CART SIDEBAR ── */
+        .cart-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); z-index:200; }
+        .cart-overlay.open { display:block; }
+
+        .cart-sidebar {
+            position:fixed; top:0; right:-420px; width:400px;
+            height:100vh; background:#0d1526; border-left:1px solid var(--border);
+            z-index:201; display:flex; flex-direction:column;
+            transition:right 0.3s ease;
+        }
+        .cart-sidebar.open { right:0; }
+
+        .cart-header {
+            padding:18px 22px; border-bottom:1px solid var(--border);
+            display:flex; align-items:center; justify-content:space-between;
+        }
+        .cart-header h3 { color:var(--t1); font-size:0.95rem; display:flex; align-items:center; gap:9px; }
+        .cart-header h3 i { color:var(--accent); }
+
+        .cart-close {
+            width:28px; height:28px; background:rgba(248,113,113,0.1);
+            color:var(--danger); border:none; border-radius:7px;
+            cursor:pointer; display:flex; align-items:center; justify-content:center;
+        }
+
+        .cart-items { flex:1; overflow-y:auto; padding:14px 22px; }
+        .cart-empty { text-align:center; color:var(--t3); padding:48px 0; font-size:0.9rem; }
+        .cart-empty i { font-size:2rem; margin-bottom:12px; display:block; }
+
+        .cart-item {
+            display:flex; align-items:center; gap:12px;
+            padding:12px 0; border-bottom:1px solid var(--border);
+        }
+        .cart-item:last-child { border-bottom:none; }
+        .cart-item-img { width:44px; height:44px; border-radius:8px; object-fit:cover; background:var(--input); border:1px solid var(--border); flex-shrink:0; }
+        .cart-item-info { flex:1; }
+        .cart-item-name  { font-size:0.85rem; color:var(--t1); font-weight:600; }
+        .cart-item-price { font-size:0.75rem; color:var(--t3); margin-top:2px; }
+        .cart-item-sub   { color:var(--accent); font-weight:700; font-size:0.88rem; white-space:nowrap; }
+        .cart-item-rm {
+            width:24px; height:24px; background:rgba(248,113,113,0.1);
+            color:var(--danger); border:none; border-radius:6px;
+            cursor:pointer; font-size:0.72rem;
+            display:flex; align-items:center; justify-content:center;
+        }
+
+        .cart-footer { padding:18px 22px; border-top:1px solid var(--border); }
+        .cart-total-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+        .cart-total-label { font-size:0.85rem; color:var(--t3); font-weight:600; text-transform:uppercase; }
+        .cart-total-value { font-size:1.3rem; font-weight:700; color:var(--success); }
+
+        .checkout-btn {
+            width:100%; padding:12px; background:var(--accent);
+            color:#0f172a; border:none; border-radius:10px;
+            font-weight:700; font-size:0.95rem; cursor:pointer;
+            transition:all 0.2s; display:flex; align-items:center;
+            justify-content:center; gap:8px;
+        }
+        .checkout-btn:hover { background:var(--accent-d); }
+        .checkout-btn:disabled { background:#334155; color:var(--t3); cursor:not-allowed; }
+
+        /* ── INVOICE MODAL ── */
+        .invoice-overlay {
+            display:none; position:fixed; inset:0;
+            background:rgba(0,0,0,0.7); backdrop-filter:blur(6px);
+            z-index:300; align-items:center; justify-content:center; padding:20px;
+        }
+        .invoice-overlay.open { display:flex; }
+
+        .invoice-box {
+            background:white; border-radius:16px; width:100%;
+            max-width:560px; max-height:90vh; overflow-y:auto;
+            animation:invIn 0.3s ease;
+        }
+        @keyframes invIn { from{opacity:0;transform:scale(0.95)} to{opacity:1;transform:scale(1)} }
+
+        .invoice-content { padding:40px; color:#0f172a; }
+        .inv-title { font-size:1.5rem; font-weight:800; color:#0f172a; }
+        .inv-sub   { font-size:0.75rem; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-top:2px; }
+        .inv-divider { height:2px; background:linear-gradient(to right,#38bdf8,transparent); margin:18px 0; }
+
+        .inv-meta { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:22px; }
+        .inv-meta label { font-size:0.65rem; color:#64748b; text-transform:uppercase; letter-spacing:0.6px; font-weight:700; display:block; margin-bottom:2px; }
+        .inv-meta span  { font-size:0.88rem; color:#0f172a; font-weight:600; }
+
+        .inv-table { width:100%; border-collapse:collapse; margin-bottom:18px; }
+        .inv-table th { background:#0f172a; color:white; padding:9px 12px; text-align:left; font-size:0.72rem; text-transform:uppercase; }
+        .inv-table td { padding:9px 12px; border-bottom:1px solid #f1f5f9; font-size:0.85rem; color:#334155; }
+        .inv-table tr:nth-child(even) td { background:#f8fafc; }
+
+        .inv-total { display:flex; justify-content:flex-end; align-items:center; gap:16px; padding:12px 16px; background:#f0f9ff; border-radius:10px; border:1px solid #bae6fd; margin-bottom:22px; }
+        .inv-total-label { font-size:0.82rem; color:#64748b; font-weight:600; text-transform:uppercase; }
+        .inv-total-value { font-size:1.3rem; font-weight:800; color:#0284c7; }
+
+        .inv-footer { text-align:center; color:#94a3b8; font-size:0.78rem; border-top:1px solid #e2e8f0; padding-top:14px; }
+
+        .inv-actions {
+            display:flex; gap:10px; padding:18px 40px;
+            border-top:1px solid #e2e8f0; background:#f8fafc;
+            border-radius:0 0 16px 16px;
+        }
+        .inv-print-btn {
+            flex:1; padding:11px; background:#0f172a; color:white;
+            border:none; border-radius:9px; font-weight:700; font-size:0.88rem;
+            cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+        }
+        .inv-close-btn {
+            flex:1; padding:11px; background:transparent; color:#64748b;
+            border:1px solid #e2e8f0; border-radius:9px; font-weight:600;
+            font-size:0.88rem; cursor:pointer;
+        }
+
+        @media print {
+            body * { visibility:hidden; }
+            .invoice-content, .invoice-content * { visibility:visible; }
+            .invoice-content { position:fixed; top:0; left:0; width:100%; }
+            .inv-actions { display:none !important; }
+        }
+
+        ::-webkit-scrollbar { width:5px; }
+        ::-webkit-scrollbar-track { background:var(--bg); }
+        ::-webkit-scrollbar-thumb { background:#334155; border-radius:3px; }
+    </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="shop-header">
+    <div class="brand">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Smart ERP">
+        <div>
+            <span class="brand-name">Smart ERP</span>
+            <span class="brand-sub">Customer Shop</span>
+        </div>
+    </div>
+
+    <div class="header-right">
+        <!-- Customer name auto shown from session -->
+        <div class="welcome-chip">
+            <div class="avatar">{{ customer_name[0].upper() }}</div>
+            <span>{{ customer_name }}</span>
+        </div>
+
+        <button class="cart-btn" onclick="openCart()">
+            <i class="fa-solid fa-cart-shopping"></i>
+            Cart
+            <span class="cart-count" id="cartCount">0</span>
+        </button>
+
+        <a href="{{ url_for('customer_logout') }}" class="logout-link">
+            <i class="fa-solid fa-right-from-bracket"></i> Logout
+        </a>
+    </div>
+</header>
+
+<!-- MAIN -->
+<div class="shop-main">
+
+    <!-- Search + Filter -->
+    <div class="shop-toolbar">
+        <div class="shop-search">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <input type="text" id="shopSearch" placeholder="Search products..." oninput="filterShop()">
+        </div>
+        <div class="filter-btns" id="filterBtns">
+            <button class="filter-btn active" onclick="filterByCategory('all', this)">
+                <i class="fa-solid fa-border-all"></i> All
+            </button>
+        </div>
+    </div>
+
+    <!-- Products Grid -->
+    <div class="products-grid" id="productsGrid">
+        {% for product in products %}
+        <div class="product-card"
+             data-id="{{ product.product_id }}"
+             data-name="{{ product.product_name }}"
+             data-price="{{ product.selling_price }}"
+             data-stock="{{ product.stock_quantity }}"
+             data-category="{{ product.category_name or 'General' }}"
+             data-image="{{ product.image_path or '' }}">
+
+            <!-- Product Image -->
+            <div class="product-img-wrap" id="imgwrap_{{ product.product_id }}">
+                {% if product.image_path %}
+                    <img src="{{ product.image_path }}"
+                         alt="{{ product.product_name }}"
+                         onerror="autoFetchImage(this, '{{ product.product_name|replace("'","") }}')"
+                         style="width:100%;height:100%;object-fit:cover;">
+                {% else %}
+                    <img src=""
+                         alt="{{ product.product_name }}"
+                         id="autoimg_{{ product.product_id }}"
+                         data-product="{{ product.product_name|replace("'","") }}"
+                         style="width:100%;height:100%;object-fit:cover;display:none;"
+                         onerror="autoFetchImage(this, '{{ product.product_name|replace("'","") }}')">
+                    <div class="product-img-placeholder" id="placeholder_{{ product.product_id }}">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                        <span>Loading...</span>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Product Info -->
+            <div class="product-info">
+                <div class="product-cat">{{ product.category_name or 'General' }}</div>
+                <div class="product-name">{{ product.product_name }}</div>
+                <div class="product-price">Rs. {{ "%.2f"|format(product.selling_price) }}</div>
+                <div class="product-stock {% if product.stock_quantity <= 5 %}low{% endif %}">
+                    <i class="fa-solid fa-boxes-stacked"></i>
+                    {{ product.stock_quantity }} in stock
+                </div>
+                <div class="qty-row">
+                    <button class="qty-btn" onclick="changeQty({{ product.product_id }}, -1)">−</button>
+                    <input class="qty-input" type="number"
+                           id="qty_{{ product.product_id }}"
+                           value="1" min="1" max="{{ product.stock_quantity }}">
+                    <button class="qty-btn" onclick="changeQty({{ product.product_id }}, 1)">+</button>
+                </div>
+            </div>
+
+            <!-- Add to Cart Button -->
+            <button class="add-cart-btn" id="btn_{{ product.product_id }}"
+                onclick="addToCart(
+                    {{ product.product_id }},
+                    '{{ product.product_name|replace("'", "\\'") }}',
+                    {{ product.selling_price }},
+                    {{ product.stock_quantity }},
+                    '{{ product.image_path or '' }}'
+                )">
+                <i class="fa-solid fa-cart-plus"></i> Add to Cart
+            </button>
+        </div>
+        {% else %}
+        <div style="grid-column:1/-1;text-align:center;padding:60px;color:var(--t3);">
+            <i class="fa-solid fa-box-open" style="font-size:3rem;margin-bottom:16px;display:block;"></i>
+            <p>No products available at the moment.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+
+
+<!-- CART OVERLAY + SIDEBAR -->
+<div class="cart-overlay" id="cartOverlay" onclick="closeCart()"></div>
+
+<div class="cart-sidebar" id="cartSidebar">
+    <div class="cart-header">
+        <h3><i class="fa-solid fa-cart-shopping"></i> Your Cart</h3>
+        <button class="cart-close" onclick="closeCart()"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="cart-items" id="cartItems">
+        <div class="cart-empty">
+            <i class="fa-solid fa-cart-shopping"></i>
+            Your cart is empty
+        </div>
+    </div>
+    <div class="cart-footer">
+        <div class="cart-total-row">
+            <span class="cart-total-label">Total</span>
+            <span class="cart-total-value" id="cartTotal">Rs. 0.00</span>
+        </div>
+        <button class="checkout-btn" id="checkoutBtn" onclick="placeOrder()">
+            <i class="fa-solid fa-check"></i> Place Order
+        </button>
+    </div>
+</div>
+
+
+<!-- INVOICE MODAL -->
+<div class="invoice-overlay" id="invoiceOverlay">
+    <div class="invoice-box">
+        <div class="invoice-content" id="invoiceContent"></div>
+        <div class="inv-actions">
+            <button class="inv-print-btn" onclick="printInvoice()">
+                <i class="fa-solid fa-print"></i> Print Invoice
+            </button>
+            <button class="inv-close-btn" onclick="closeInvoice()">
+                <i class="fa-solid fa-xmark"></i> Close
+            </button>
+        </div>
+    </div>
+</div>
+
+
+<script>
+// ── Build category filters ──
+const cards = document.querySelectorAll('.product-card');
+const cats  = new Set();
+cards.forEach(c => cats.add(c.dataset.category));
+
+cats.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn';
+    btn.innerHTML = cat;
+    btn.onclick = () => filterByCategory(cat, btn);
+    document.getElementById('filterBtns').appendChild(btn);
+});
+
+function filterByCategory(cat, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    cards.forEach(card => {
+        card.style.display = (cat === 'all' || card.dataset.category === cat) ? '' : 'none';
+    });
+}
+
+function filterShop() {
+    const q = document.getElementById('shopSearch').value.toLowerCase();
+    cards.forEach(card => {
+        const match = card.dataset.name.toLowerCase().includes(q) ||
+                      card.dataset.category.toLowerCase().includes(q);
+        card.style.display = match ? '' : 'none';
+    });
+}
+
+function changeQty(id, delta) {
+    const input = document.getElementById(`qty_${id}`);
+    let val = parseInt(input.value) + delta;
+    if (val < 1) val = 1;
+    if (val > parseInt(input.max)) val = parseInt(input.max);
+    input.value = val;
+}
+
+// ── CART ──
+let cart = {};
+
+function addToCart(id, name, price, stock, imagePath) {
+    const qty    = parseInt(document.getElementById(`qty_${id}`).value) || 1;
+    const inCart = cart[id] ? cart[id].quantity : 0;
+
+    if (inCart + qty > stock) {
+        alert(`Only ${stock} units available. You already have ${inCart} in cart.`);
+        return;
+    }
+
+    if (cart[id]) { cart[id].quantity += qty; }
+    else { cart[id] = { id, name, price, quantity: qty, imagePath }; }
+
+    const btn = document.getElementById(`btn_${id}`);
+    btn.classList.add('added');
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> Added!';
+    setTimeout(() => {
+        btn.classList.remove('added');
+        btn.innerHTML = '<i class="fa-solid fa-cart-plus"></i> Add to Cart';
+    }, 1500);
+
+    updateCartUI();
+}
+
+function removeFromCart(id) { delete cart[id]; updateCartUI(); }
+
+function updateCartUI() {
+    const items = Object.values(cart);
+    const count = items.reduce((s,i) => s + i.quantity, 0);
+    const total = items.reduce((s,i) => s + i.price * i.quantity, 0);
+
+    document.getElementById('cartCount').textContent = count;
+    document.getElementById('cartTotal').textContent = `Rs. ${total.toFixed(2)}`;
+
+    const el = document.getElementById('cartItems');
+    if (items.length === 0) {
+        el.innerHTML = `<div class="cart-empty"><i class="fa-solid fa-cart-shopping"></i>Your cart is empty</div>`;
+        return;
+    }
+
+    el.innerHTML = '';
+    items.forEach(item => {
+        const sub  = (item.price * item.quantity).toFixed(2);
+        const img  = item.imagePath
+            ? `<img src="${item.imagePath}" class="cart-item-img" alt="${item.name}">`
+            : `<div class="cart-item-img" style="display:flex;align-items:center;justify-content:center;color:#334155;"><i class="fa-solid fa-box"></i></div>`;
+
+        el.innerHTML += `
+            <div class="cart-item">
+                ${img}
+                <div class="cart-item-info">
+                    <div class="cart-item-name">${item.name}</div>
+                    <div class="cart-item-price">Rs. ${item.price.toFixed(2)} × ${item.quantity}</div>
+                </div>
+                <span class="cart-item-sub">Rs. ${sub}</span>
+                <button class="cart-item-rm" onclick="removeFromCart(${item.id})">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>`;
+    });
+}
+
+function openCart()  { document.getElementById('cartSidebar').classList.add('open'); document.getElementById('cartOverlay').classList.add('open'); }
+function closeCart() { document.getElementById('cartSidebar').classList.remove('open'); document.getElementById('cartOverlay').classList.remove('open'); }
+
+// ── PLACE ORDER ──
+function placeOrder() {
+    const items = Object.values(cart);
+    if (items.length === 0) { alert("Your cart is empty!"); return; }
+
+    const btn = document.getElementById('checkoutBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Placing Order...';
+
+    fetch('/place_order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            items: items.map(i => ({ product_id: i.id, quantity: i.quantity }))
+        })
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.error) {
+            alert(result.error);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> Place Order';
+            return;
+        }
+        cart = {};
+        updateCartUI();
+        closeCart();
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Place Order';
+        showInvoice(result.invoice_id, result.customer, result.total);
+    })
+    .catch(err => {
+        console.error(err);
+        alert("Something went wrong.");
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Place Order';
+    });
+}
+
+// ── INVOICE ──
+function showInvoice(invoiceId, customerName, total) {
+    fetch(`/get_invoice/${invoiceId}`)
+    .then(res => res.json())
+    .then(data => {
+        const inv   = data.invoice;
+        const items = data.items;
+        const date  = inv.invoice_date.substring(0, 19).replace('T', ' ');
+
+        let rows = '';
+        items.forEach((item, i) => {
+            rows += `
+                <tr>
+                    <td>${i + 1}</td>
+                    <td>${item.product_name}</td>
+                    <td style="text-align:center;">${item.quantity}</td>
+                    <td>Rs. ${parseFloat(item.selling_price).toFixed(2)}</td>
+                    <td>Rs. ${parseFloat(item.subtotal).toFixed(2)}</td>
+                </tr>`;
+        });
+
+        document.getElementById('invoiceContent').innerHTML = `
+            <div style="margin-bottom:20px;">
+                <div class="inv-title">Smart ERP System</div>
+                <div class="inv-sub">Sales Invoice</div>
+            </div>
+            <div class="inv-divider"></div>
+            <div class="inv-meta">
+                <div>
+                    <label>Invoice No</label>
+                    <span>INV-${String(invoiceId).padStart(4,'0')}</span>
+                </div>
+                <div>
+                    <label>Date & Time</label>
+                    <span>${date}</span>
+                </div>
+                <div>
+                    <label>Customer Name</label>
+                    <span>${inv.customer_name}</span>
+                </div>
+                <div>
+                    <label>Payment Status</label>
+                    <span style="color:#16a34a;font-weight:700;"><i class="fa-solid fa-circle-check"></i> Paid</span>
+                </div>
+            </div>
+            <table class="inv-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Product</th>
+                        <th style="text-align:center;">Qty</th>
+                        <th>Unit Price</th>
+                        <th>Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+            <div class="inv-total">
+                <span class="inv-total-label">Total Amount</span>
+                <span class="inv-total-value">Rs. ${parseFloat(inv.total_amount).toFixed(2)}</span>
+            </div>
+            <div class="inv-footer">
+                Thank you for shopping with us!<br>
+                Smart ERP System &mdash; ${new Date().getFullYear()}
+            </div>
+        `;
+
+        document.getElementById('invoiceOverlay').classList.add('open');
+    });
+}
+
+function printInvoice() { window.print(); }
+
+function closeInvoice() {
+    document.getElementById('invoiceOverlay').classList.remove('open');
+    location.reload();
+}
+
+// ── PRODUCT IMAGE SYSTEM ──
+// Maps each product to its correct image using product name keywords
+
+const productImageMap = {
+    // Mobile Phones
+    'iphone 15 pro max':     'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/iphone-15-pro-finish-select-202309-6-1inch?wid=400',
+    'iphone 15':             'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/iphone-15-finish-select-202309-6-1inch-pink?wid=400',
+    'samsung galaxy s24':    'https://images.samsung.com/is/image/samsung/p6pim/in/2401/gallery/in-galaxy-s24-ultra-s928-sm-s928bzkgins-thumb-539238865?w=400',
+    'samsung galaxy a55':    'https://images.samsung.com/is/image/samsung/p6pim/in/sm-a556elgains/gallery/in-galaxy-a55-5g-sm-a556-482294-sm-a556elgains-thumb-540155199?w=400',
+    'oneplus':               'https://image01.oneplus.net/ebp/202312/12/1-m00-57-d0-rb8bwgv7kbeac2jcaafk1ewxxme648.png',
+    'redmi note':            'https://i02.appmifile.com/mi-com-product/fly-birds/redmi-note-13-pro-plus/M/31f4e5e9be38e25e2fcfd48a66e71b7c.png',
+    'redmi 13c':             'https://i02.appmifile.com/mi-com-product/fly-birds/redmi-13c/6ef4e1e2a7bf89c18ce8b29fb74f3fbb.png',
+    'realme':                'https://image.realme.com/upload/2024/01/26/f2b22344bfbc4c5d82e58fee56d6bd93.png',
+    'oppo':                  'https://www.oppo.com/content/dam/oppo/product-asset-library/reno/reno11-pro/assets/img/overview/design-1.png',
+    'vivo':                  'https://www.vivo.com/in/content/dam/vivo/in/products/v30-pro/overview/1-1.png',
+    'google pixel':          'https://lh3.googleusercontent.com/BaV4GsZ_NMQ5z2VLiRfnJwqYNBRCBHJJlWmqZ-6xhvNlQ7p3PqP6IHs-W_0d_e5rfQ=w400',
+    'nothing phone':         'https://in.nothing.tech/cdn/shop/files/nothing_phone_2a_black.png?width=400',
+    'motorola':              'https://motorola-global-portal.custhelp.com/ci/fattach/get/2154/0/filename/moto_edge_50_pro.png',
+    'iqoo':                  'https://images.vivo.com/upload/2024/02/20/3fbc22ff-c3ba-4db2-93ee-5d02e2f7b1dc.png',
+
+    // Laptops
+    'macbook air':           'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/macbook-air-midnight-select-20220606?wid=400',
+    'macbook pro':           'https://store.storeimages.cdn-apple.com/4982/as-images.apple.com/is/mbp14-spacegray-select-202310?wid=400',
+    'dell xps':              'https://i.dell.com/is/image/DellContent/content/dam/ss2/product-images/dell-client-products/notebooks/xps-notebooks/xps-15-9530/media-gallery/black/notebook-xps-15-9530-t-black-gallery-1.psd?wid=400',
+    'hp pavilion':           'https://ssl-product-images.www8-hp.com/digmedialib/prodimg/knowledgebase/c08000000/c08065000/c08065000/c08065500/c08065584.png',
+    'lenovo ideapad':        'https://p1-ofp.static.pub/fes/cms/2022/09/28/j5hjgdlg5n4y9fhixvmx8lp6jdl7h3226983.png',
+    'asus rog':              'https://dlcdnwebimgs.asus.com/gain/CE95FDBA-4B70-44A8-95E0-5A07A5C7B7C7/w800',
+    'acer aspire':           'https://static-ecapac.acer.com/media/catalog/product/a/s/aspire_7_a715-76g_nxqmfsi003_01.png',
+    'dell inspiron':         'https://i.dell.com/is/image/DellContent/content/dam/ss2/product-images/dell-client-products/notebooks/inspiron-notebooks/inspiron-15-3530/media-gallery/black/notebook-inspiron-15-3530-black-gallery-1.psd?wid=400',
+    'logitech':              'https://resource.logitech.com/w_692,c_lpad,ar_4:3,q_auto,f_auto,dpr_1.0/d_transparent.gif/content/dam/logitech/en/products/mice/mx-master-3s/gallery/mx-master-3s-mouse-top-view-graphite.png',
+    'keychron':              'https://www.keychron.com/cdn/shop/products/Keychron-K2-wireless-mechanical-keyboard-with-Gateron-G-Pro-switches.jpg?v=1604576809&width=400',
+    'samsung 1tb':           'https://images.samsung.com/is/image/samsung/p6pim/in/mz-77e1t0b/gallery/in-860-evo-sata-iii-2-5-inch-ssd-mz-77e1t0b-420293-sm-mz-77e1t0b-ind-rperspectivegrey-128647085?w=400',
+    'seagate':               'https://www.seagate.com/content/dam/seagate/migrated-assets/www-content/products/laptops/barracuda/_shared/images/barracuda-2-5-front-top-angle-1200x900.png',
+
+    // Electronics
+    'samsung 55':            'https://images.samsung.com/is/image/samsung/p6pim/in/ua55au7700klxl/gallery/in-uhd-au7700-ua55au7700klxl-front-black-474817-474817.jpg?w=400',
+    'lg 43':                 'https://lg-webos.cdn.lg.com/laser/samsung/image.jpg',
+    'sony bravia':           'https://www.sony.co.in/image/d563e45e17017bc76b7b6d025b9e7249?fmt=pjpeg&wid=400',
+    'boat bluetooth':        'https://www.boat-lifestyle.com/cdn/shop/products/Rockerz-480_1.jpg?v=1634806454&width=400',
+    'jbl flip':              'https://in.jbl.com/dw/image/v2/AAUJ_PRD/on/demandware.static/-/Sites-master-catalog/default/dw30d2cf41/1.JBL_FLIP6_Product%20Image_Hero_White.jpg?wid=400',
+    'sony wh':               'https://www.sony.co.in/image/5d02da5df552836db894cead06d923a1?fmt=pjpeg&wid=400',
+    'airdopes':              'https://www.boat-lifestyle.com/cdn/shop/products/Airdopes-141_2.jpg?v=1634806454&width=400',
+    'canon eos':             'https://in.canon/media/image/2019/02/12/5b3f2e4c1dc64a7d9a9f5f1b0e3d8c2a_EOS+1500D+BODY.jpg',
+    'gopro':                 'https://community.gopro.com/t5/image/serverpage/image-id/108660iA3E7F6C4A7CD0C64?v=v2',
+    'nikon':                 'https://www.nikon.co.in/content/dam/nikon/products/mirrorless/z-30/gallery/nikon-z-30-gallery-01.jpg',
+    'air fryer':             'https://www.philips.co.in/c-dam/b2c/category-pages/Cooking/airfryer/Airfryer-5000-series/HD9200-90-1.jpg',
+    'dyson':                 'https://dyson-h.assetsadobe2.com/is/image/content/dam/dyson/products/vacuums/v12/v12-detect-slim-absolute-yellow/v12-yellow-angle.png?wid=400',
+    'air purifier':          'https://i01.appmifile.com/mi-com-product/fly-birds/mi-air-purifier-4/en/img/specs.png',
+    'havells':               'https://www.havells.com/content/dam/havells/residential/air-conditioners/rac/1-5-ton-3-star-inverter/HPACHOF3P018.jpg',
+    'voltas':                'https://www.tatacliq.com/media/catalog/product/1/8/185v-czj1_1.jpg',
+
+    // Clothing
+    'allen solly':           'https://images.asos-media.com/products/allen-solly-shirt/203542289-1-white',
+    'raymond suit':          'https://www.raymond.in/media/catalog/product/r/a/raymond_suit.jpg',
+    'levi':                  'https://lsco.scene7.com/is/image/lscoaparel/511-slim-fit-jeans-mens-pants-511-slim-jeans-00511-04-hero?wid=400',
+    'peter england':         'https://assets.myntassets.com/h_1440,q_90,w_1080/v1/assets/images/12297736/2020/10/6/peter-england.jpg',
+    'van heusen':            'https://assets.myntassets.com/h_1440,q_90,w_1080/v1/assets/images/van-heusen-polo.jpg',
+    'h&m':                   'https://lp2.hm.com/hmgoepprod?set=quality%5B79%5D%2Csource%5B%2F58%2Fd5%2F58d5bacd1c1d07ded0d4c2cbb0b4d52b4be5fc76.jpg%5D&wid=400',
+    'zara':                  'https://static.zara.net/photos///2023/V/0/1/p/2778/256/704/2/w/400/2778256704_1_1_1.jpg',
+    'kurta':                 'https://assets.myntassets.com/h_1440,q_90,w_1080/v1/assets/images/kurta-set.jpg',
+    'biba':                  'https://assets.myntassets.com/h_1440,q_90,w_1080/v1/assets/images/biba-anarkali.jpg',
+    'fabindia':              'https://www.fabindia.com/media/catalog/product/f/a/fabindia-saree.jpg',
+    'nike dri':              'https://static.nike.com/a/images/t_PDP_1280_v1/f_auto,q_auto:eco/tshirt.jpg',
+    'adidas joggers':        'https://assets.adidas.com/images/h_840,f_auto,q_auto,fl_lossy,c_fill/joggers.jpg',
+    'puma hoodie':           'https://images.puma.com/image/upload/f_auto,q_auto,b_rgb:fafafa/global/hoodie.jpg',
+
+    // Footwear
+    'nike air max':          'https://static.nike.com/a/images/t_PDP_1280_v1/f_auto,q_auto:eco/air-max-270.jpg',
+    'adidas ultraboost':     'https://assets.adidas.com/images/h_840,f_auto,q_auto,fl_lossy,c_fill/ultraboost-22.jpg',
+    'puma rs':               'https://images.puma.com/image/upload/f_auto,q_auto,b_rgb:fafafa/global/rs-x.jpg',
+    'red chief':             'https://www.redchiefshoes.com/media/catalog/product/shoe.jpg',
+    'bata':                  'https://heliosconsumer.com/media/catalog/product/bata-shoes.jpg',
+    'metro':                 'https://www.metroshoes.com/media/catalog/product/heels.jpg',
+    'woodland':              'https://www.woodland.co.in/media/catalog/product/boots.jpg',
+    'crocs':                 'https://www.crocs.in/media/catalog/product/crocs-classic.jpg',
+    'sparx':                 'https://cdn.abofashion.com/sparx-running-shoes.jpg',
+
+    // Food
+    'tata tea':              'https://www.tatanutrikorner.com/media/catalog/product/tata-tea-premium.jpg',
+    'nescafe':               'https://www.nestle.in/sites/g/files/pydnoa481/files/nescafe-classic.jpg',
+    'amul butter':           'https://www.amul.com/m/uploads/product/butter.jpg',
+    'sunflower oil':         'https://www.fortunefoods.com/wp-content/uploads/sunflower-oil.jpg',
+    'aashirvaad':            'https://www.idc.iitb.ac.in/resources/dt-11-2007/aashirvaad.jpg',
+    'maggi':                 'https://www.nestle.in/sites/g/files/pydnoa481/files/maggi-noodles.jpg',
+    'bournvita':             'https://www.cadbury.co.in/media/products/bournvita.jpg',
+    'horlicks':              'https://www.horlicks.in/media/horlicks-1kg.jpg',
+    'lay':                   'https://www.pepsicoindia.com/media/lays-chips.jpg',
+    'haldiram':              'https://www.haldirams.com/media/catalog/product/namkeen.jpg',
+    'basmati rice':          'https://www.indiagate.in/wp-content/uploads/basmati-rice.jpg',
+    'toor dal':              'https://www.daawat.com/wp-content/uploads/toor-dal.jpg',
+    'red bull':              'https://www.redbull.com/v3/img/red-bull-energy-drink.jpg',
+
+    // Home & Kitchen
+    'prestige':              'https://www.ttk-prestige.com/media/catalog/product/pressure-cooker.jpg',
+    'milton flask':          'https://www.miltonworld.com/media/catalog/product/flask.jpg',
+    'borosil':               'https://www.borosil.com/media/catalog/product/glass-set.jpg',
+    'non-stick pan':         'https://www.pigeon.in/media/catalog/product/pan-set.jpg',
+    'cello water':           'https://www.cello.co.in/media/catalog/product/water-bottle.jpg',
+    'tupperware':            'https://www.tupperware.co.in/media/catalog/product/lunch-box.jpg',
+    'bajaj mixer':           'https://www.bajajelectricals.com/media/catalog/product/mixer-grinder.jpg',
+    'philips induction':     'https://www.philips.co.in/c-dam/b2c/induction.jpg',
+    'kent ro':               'https://www.kent.co.in/images/products/ro-water-purifier.jpg',
+    'usha fan':              'https://www.usha.com/media/catalog/product/fan.jpg',
+
+    // Furniture
+    'nilkamal':              'https://www.nilkamal.com/media/catalog/product/sofa.jpg',
+    'king size bed':         'https://images.unsplash.com/photo-1505693314120-0d443867891c?w=400',
+    'study table':           'https://images.unsplash.com/photo-1518455027359-f3f8164ba6bd?w=400',
+    'revolving office':      'https://images.unsplash.com/photo-1592078615290-033ee584e267?w=400',
+    'shoe rack':             'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400',
+    'bookshelf':             'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+    'dining table':          'https://images.unsplash.com/photo-1617098474202-0d0d7e1bfc5f?w=400',
+    'wardrobe':              'https://images.unsplash.com/photo-1595428774223-ef52624120d2?w=400',
+
+    // Books
+    'rich dad':              'https://m.media-amazon.com/images/I/51hSZHeHx-L._SX350_BO1,204,203,200_.jpg',
+    'atomic habits':         'https://m.media-amazon.com/images/I/513Y5o-DYtL._SX346_BO1,204,203,200_.jpg',
+    'alchemist':             'https://m.media-amazon.com/images/I/51Z0nLAfLmL._SX346_BO1,204,203,200_.jpg',
+    'wings of fire':         'https://m.media-amazon.com/images/I/51FwPRnRvAL._SX335_BO1,204,203,200_.jpg',
+    'zero to one':           'https://m.media-amazon.com/images/I/4137OGQSqeL._SX334_BO1,204,203,200_.jpg',
+    'think and grow':        'https://m.media-amazon.com/images/I/41sknMCzLtL._SX334_BO1,204,203,200_.jpg',
+    'python programming':    'https://m.media-amazon.com/images/I/51-t9HlBkTL._SX379_BO1,204,203,200_.jpg',
+    'clean code':            'https://m.media-amazon.com/images/I/41xShlnTZTL._SX376_BO1,204,203,200_.jpg',
+    'data structures':       'https://m.media-amazon.com/images/I/61Wy9viNq6L._SX379_BO1,204,203,200_.jpg',
+    'ncert':                 'https://ncert.nic.in/textbook/pdf/cover/leph1.jpg',
+
+    // Sports
+    'cosco football':        'https://m.media-amazon.com/images/I/71RM7g0Y1hL._SL1500_.jpg',
+    'yonex':                 'https://m.media-amazon.com/images/I/61pXGWGdLwL._SL1500_.jpg',
+    'sg cricket':            'https://m.media-amazon.com/images/I/51S0nGR2jFL._SL1200_.jpg',
+    'nivia':                 'https://m.media-amazon.com/images/I/71hQjYq7KFL._SL1500_.jpg',
+    'decathlon yoga':        'https://contents.mediadecathlon.com/p2212454/k$f69cde6cdcbe3dab5c13b9c56b5e4b8b/sq/yoga-mat.jpg?width=400',
+    'boldfit':               'https://m.media-amazon.com/images/I/81oEV59+6vL._SL1500_.jpg',
+    'powerblock':            'https://m.media-amazon.com/images/I/71k4bWEi5HL._SL1500_.jpg',
+    'skipping rope':         'https://m.media-amazon.com/images/I/61FBcAaTxlL._SL1500_.jpg',
+    'protein shaker':        'https://m.media-amazon.com/images/I/71xMokUyAQL._SL1500_.jpg',
+
+    // Beauty
+    'lakme':                 'https://www.lakmeindia.com/media/catalog/product/face-wash.jpg',
+    'nivea':                 'https://www.nivea.in/-/media/Product-Images/body-lotion.png',
+    'himalaya neem':         'https://www.himalayawellness.in/cdn/shop/products/face-pack.jpg',
+    'shampoo':               'https://www.lorealparis.co.in/-/media/project/loreal/shampoo.jpg',
+    'dove soap':             'https://www.dove.com/content/dam/dove/soap.jpg',
+    'gillette':              'https://www.gillette.co.in/media/catalog/product/razor.jpg',
+    'park avenue':           'https://m.media-amazon.com/images/I/61perfume.jpg',
+    'maybelline':            'https://www.maybelline.in/media/catalog/product/lipstick.jpg',
+    'vlcc':                  'https://www.vlccpersonal.com/media/catalog/product/face-cream.jpg',
+
+    // Toys
+    'lego':                  'https://www.lego.com/cdn/cs/set/assets/blt4b44f9c4d9c4c4c0/lego-classic.jpg',
+    'hot wheels':            'https://cdn.mattel.com/is/image/MattelAFE/HW.jpg',
+    'monopoly':              'https://m.media-amazon.com/images/I/81oM6SQHpFL._AC_SL1500_.jpg',
+    'barbie dreamhouse':     'https://cdn.mattel.com/is/image/MattelAFE/barbie-dreamhouse.jpg',
+    'remote control car':    'https://m.media-amazon.com/images/I/71RM7g0rc-car.jpg',
+    'rubik':                 'https://m.media-amazon.com/images/I/71GsofSbOiL._SL1500_.jpg',
+    'carrom':                'https://m.media-amazon.com/images/I/71carrom.jpg',
+    'chess set':             'https://m.media-amazon.com/images/I/71chess.jpg',
+    'nerf':                  'https://m.media-amazon.com/images/I/81nerf.jpg',
+};
+
+// Category fallback images
+const categoryImages = {
+    'phone':     'https://images.unsplash.com/photo-1598327105666-5b89351aff97?w=400',
+    'laptop':    'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=400',
+    'tv':        'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?w=400',
+    'audio':     'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400',
+    'camera':    'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=400',
+    'shirt':     'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400',
+    'dress':     'https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=400',
+    'shoe':      'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400',
+    'furniture': 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400',
+    'book':      'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400',
+    'food':      'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400',
+    'kitchen':   'https://images.unsplash.com/photo-1585664811087-47f65abbad64?w=400',
+    'sports':    'https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400',
+    'beauty':    'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=400',
+    'toy':       'https://images.unsplash.com/photo-1587654780291-39c9404d746b?w=400',
+    'default':   'https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400',
+};
+
+function getProductImage(productName) {
+    const name = productName.toLowerCase();
+
+    // Check exact product map first
+    for (const [key, url] of Object.entries(productImageMap)) {
+        if (name.includes(key)) return url;
+    }
+
+    // Category fallback
+    if (name.includes('phone') || name.includes('iphone') || name.includes('samsung') || name.includes('redmi') || name.includes('realme') || name.includes('oppo') || name.includes('vivo') || name.includes('oneplus') || name.includes('pixel') || name.includes('nothing') || name.includes('motorola') || name.includes('iqoo'))
+        return categoryImages['phone'];
+    if (name.includes('laptop') || name.includes('macbook') || name.includes('dell') || name.includes('hp') || name.includes('lenovo') || name.includes('asus') || name.includes('acer') || name.includes('monitor') || name.includes('keyboard') || name.includes('mouse') || name.includes('ssd') || name.includes('hdd'))
+        return categoryImages['laptop'];
+    if (name.includes('tv') || name.includes('television'))
+        return categoryImages['tv'];
+    if (name.includes('speaker') || name.includes('headphone') || name.includes('earphone') || name.includes('airpod') || name.includes('earbud') || name.includes('boat') || name.includes('jbl') || name.includes('sony wh'))
+        return categoryImages['audio'];
+    if (name.includes('camera') || name.includes('gopro') || name.includes('nikon') || name.includes('canon'))
+        return categoryImages['camera'];
+    if (name.includes('shirt') || name.includes('suit') || name.includes('trouser') || name.includes('jeans') || name.includes('t-shirt') || name.includes('polo') || name.includes('hoodie') || name.includes('jogger'))
+        return categoryImages['shirt'];
+    if (name.includes('dress') || name.includes('kurta') || name.includes('saree') || name.includes('blazer') || name.includes('anarkali'))
+        return categoryImages['dress'];
+    if (name.includes('shoe') || name.includes('nike') || name.includes('adidas') || name.includes('puma') || name.includes('sneaker') || name.includes('boot') || name.includes('heel') || name.includes('croc') || name.includes('sparx') || name.includes('bata'))
+        return categoryImages['shoe'];
+    if (name.includes('sofa') || name.includes('bed') || name.includes('table') || name.includes('chair') || name.includes('wardrobe') || name.includes('shelf') || name.includes('rack') || name.includes('dining'))
+        return categoryImages['furniture'];
+    if (name.includes('book') || name.includes('ncert') || name.includes('habits') || name.includes('alchemist') || name.includes('python') || name.includes('code'))
+        return categoryImages['book'];
+    if (name.includes('tea') || name.includes('coffee') || name.includes('rice') || name.includes('dal') || name.includes('oil') || name.includes('atta') || name.includes('noodle') || name.includes('chips') || name.includes('butter') || name.includes('bournvita') || name.includes('horlicks'))
+        return categoryImages['food'];
+    if (name.includes('cooker') || name.includes('mixer') || name.includes('pan') || name.includes('bottle') || name.includes('flask') || name.includes('purifier') || name.includes('fan') || name.includes('induction'))
+        return categoryImages['kitchen'];
+    if (name.includes('football') || name.includes('cricket') || name.includes('badminton') || name.includes('yoga') || name.includes('dumbbell') || name.includes('gym') || name.includes('basketball') || name.includes('skipping'))
+        return categoryImages['sports'];
+    if (name.includes('cream') || name.includes('lotion') || name.includes('shampoo') || name.includes('soap') || name.includes('perfume') || name.includes('lipstick') || name.includes('lakme') || name.includes('nivea'))
+        return categoryImages['beauty'];
+    if (name.includes('lego') || name.includes('toy') || name.includes('game') || name.includes('chess') || name.includes('carrom') || name.includes('barbie') || name.includes('nerf') || name.includes('rubik') || name.includes('monopoly'))
+        return categoryImages['toy'];
+
+    return categoryImages['default'];
+}
+
+// Apply images to all products on page load
+window.addEventListener('load', () => {
+    document.querySelectorAll('.product-img-wrap').forEach(wrap => {
+        const img = wrap.querySelector('img');
+        const placeholder = wrap.querySelector('.product-img-placeholder');
+
+        if (placeholder) {
+            // No manual image — get from map
+            const card = wrap.closest('.product-card');
+            if (!card) return;
+            const productName = card.dataset.name || '';
+            const imageUrl = getProductImage(productName);
+
+            wrap.innerHTML = `<img src="${imageUrl}"
+                alt="${productName}"
+                style="width:100%;height:100%;object-fit:cover;"
+                onerror="this.src='https://images.unsplash.com/photo-1560343090-f0409e92791a?w=400'">`;
+        }
+    });
+});
+</script>
+
+</body>
+</html>
