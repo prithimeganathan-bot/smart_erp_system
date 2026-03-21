@@ -22,11 +22,11 @@ def allowed_file(filename):
 
 def get_db():
     return mysql.connector.connect(
-        host=os.environ.get('MYSQLHOST', 'localhost'),
-        user=os.environ.get('MYSQLUSER', 'root'),
-        password=os.environ.get('MYSQLPASSWORD', 'root'),
-        database=os.environ.get('MYSQLDATABASE', 'smart_erp'),
-        port=int(os.environ.get('MYSQLPORT', 3306))
+        host=os.environ["MYSQLHOST"],
+        user=os.environ["MYSQLUSER"],
+        password=os.environ["MYSQLPASSWORD"],
+        database=os.environ["MYSQLDATABASE"],
+        port=int(os.environ["MYSQLPORT"])
     )
     
 
@@ -781,4 +781,4 @@ def get_session_role():
     })
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)
