@@ -22,13 +22,11 @@ def allowed_file(filename):
 
 def get_db():
     return mysql.connector.connect(
-        host=os.environ["MYSQLHOST"],
-        user=os.environ["MYSQLUSER"],
-        password=os.environ["MYSQLPASSWORD"],
-        database=os.environ["MYSQLDATABASE"],
-        port=int(os.environ["MYSQLPORT"])
+        host='localhost',
+        user='root',
+        password='root',
+        database='smart_erp'
     )
-    
 
 # ---------------- DECORATORS ----------------
 
@@ -233,23 +231,21 @@ def get_products():
 @login_required
 @admin_required
 def add_product():
-    if request.is_json:
-        data          = request.get_json()
-        product_name  = data.get('product_name')
-        category_id   = data.get('category_id')
-        cost_price    = data.get('cost_price')
-        selling_price = data.get('selling_price')
-        stock_quantity= data.get('stock_quantity')
-        reorder_level = data.get('reorder_level', 5)
-        image_url     = data.get('image_url', None)
-    else:
-        product_name  = request.form.get('product_name')
-        category_id   = request.form.get('category_id')
-        cost_price    = request.form.get('cost_price')
-        selling_price = request.form.get('selling_price')
-        stock_quantity= request.form.get('stock_quantity')
-        reorder_level = request.form.get('reorder_level', 5)
-        image_url     = request.form.get('image_url', None)
+    product_name   = request.form.get('product_name')
+    category_id    = request.form.get('category_id')
+    cost_price     = request.form.get('cost_price')
+    selling_price  = request.form.get('selling_price')
+    stock_quantity = request.form.get('stock_quantity')
+    reorder_level  = request.form.get('reorder_level', 5)
+
+    image_path = None
+    if 'image' in request.files:
+        file = request.files['image']
+        if file and file.filename != '' and allowed_file(file.filename):
+            filename  = secure_filename(file.filename)
+            save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(save_path)
+            image_path = filename
 
     db     = get_db()
     cursor = db.cursor()
@@ -258,48 +254,54 @@ def add_product():
         (product_name, category_id, cost_price, selling_price,
          stock_quantity, reorder_level, image_path)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
-    """, (product_name, category_id, cost_price,
-          selling_price, stock_quantity, reorder_level,
-          image_url if image_url else None))
+    """, (product_name, category_id, cost_price, selling_price,
+          stock_quantity, reorder_level, image_path))
     db.commit()
     cursor.close()
     db.close()
     return jsonify({"message": "Product added successfully"})
 
-@app.route('/update_product/<int:product_id>', methods=['PUT', 'POST'])
+@app.route('/update_product/<int:product_id>', methods=['POST'])
 @login_required
 @admin_required
 def update_product(product_id):
-    # Handle both JSON and form data
-    if request.is_json:
-        data          = request.get_json()
-        product_name  = data.get('product_name')
-        category_id   = data.get('category_id')
-        cost_price    = data.get('cost_price')
-        selling_price = data.get('selling_price')
-        stock_quantity= data.get('stock_quantity')
-        reorder_level = data.get('reorder_level', 5)
-        image_url     = data.get('image_url', None)
-    else:
-        product_name  = request.form.get('product_name')
-        category_id   = request.form.get('category_id')
-        cost_price    = request.form.get('cost_price')
-        selling_price = request.form.get('selling_price')
-        stock_quantity= request.form.get('stock_quantity')
-        reorder_level = request.form.get('reorder_level', 5)
-        image_url     = request.form.get('image_url', None)
+    product_name   = request.form.get('product_name')
+    category_id    = request.form.get('category_id')
+    cost_price     = request.form.get('cost_price')
+    selling_price  = request.form.get('selling_price')
+    stock_quantity = request.form.get('stock_quantity')
+    reorder_level  = request.form.get('reorder_level', 5)
 
     db     = get_db()
     cursor = db.cursor()
-    cursor.execute("""
-        UPDATE products SET product_name=%s, category_id=%s,
-        cost_price=%s, selling_price=%s, stock_quantity=%s,
-        reorder_level=%s, image_path=%s
-        WHERE product_id=%s
-    """, (product_name, category_id, cost_price, selling_price,
-          stock_quantity, reorder_level,
-          image_url if image_url else None,
-          product_id))
+
+    if 'image' in request.files:
+        file = request.files['image']
+        if file and file.filename != '' and allowed_file(file.filename):
+            filename  = secure_filename(file.filename)
+            save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(save_path)
+            cursor.execute("""
+                UPDATE products SET product_name=%s, category_id=%s,
+                cost_price=%s, selling_price=%s, stock_quantity=%s,
+                reorder_level=%s, image_path=%s WHERE product_id=%s
+            """, (product_name, category_id, cost_price, selling_price,
+                  stock_quantity, reorder_level, filename, product_id))
+        else:
+            cursor.execute("""
+                UPDATE products SET product_name=%s, category_id=%s,
+                cost_price=%s, selling_price=%s, stock_quantity=%s,
+                reorder_level=%s WHERE product_id=%s
+            """, (product_name, category_id, cost_price, selling_price,
+                  stock_quantity, reorder_level, product_id))
+    else:
+        cursor.execute("""
+            UPDATE products SET product_name=%s, category_id=%s,
+            cost_price=%s, selling_price=%s, stock_quantity=%s,
+            reorder_level=%s WHERE product_id=%s
+        """, (product_name, category_id, cost_price, selling_price,
+              stock_quantity, reorder_level, product_id))
+
     db.commit()
     cursor.close()
     db.close()
@@ -311,20 +313,12 @@ def update_product(product_id):
 def delete_product(product_id):
     db     = get_db()
     cursor = db.cursor()
-    try:
-        # Delete related records first
-        cursor.execute("DELETE FROM sales_items WHERE product_id=%s", (product_id,))
-        cursor.execute("DELETE FROM purchase_items WHERE product_id=%s", (product_id,))
-        # Now delete the product
-        cursor.execute("DELETE FROM products WHERE product_id=%s", (product_id,))
-        db.commit()
-        return jsonify({"message": "Product deleted successfully"})
-    except Exception as e:
-        db.rollback()
-        return jsonify({"message": f"Cannot delete: {str(e)}"}), 400
-    finally:
-        cursor.close()
-        db.close()
+    cursor.execute("DELETE FROM products WHERE product_id=%s", (product_id,))
+    db.commit()
+    cursor.close()
+    db.close()
+    return jsonify({"message": "Product deleted successfully"})
+
 # ---------------- CATEGORIES ----------------
 
 @app.route('/categories')
@@ -781,4 +775,4 @@ def get_session_role():
     })
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=5000)
+    app.run(debug=True)
